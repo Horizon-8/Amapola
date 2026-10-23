@@ -1,5 +1,15 @@
 # Amapola
 
+## Versión 0.5.0 — lista para pruebas
+
+Abre **Amapola.exe del proyecto** y comprueba **v0.5.0** al pie. Todavía no se ha generado un ZIP 0.5.0.
+
+- Botón de estado junto al pago en el calendario y en la lista: **? Por confirmar → ✓ Confirmada (verde) → × Cancelada → ? Por confirmar**. Cada clic cambia solo esa sesión. El pago es independiente. Al reactivar una clase cancelada se avisa si coincide con otras actividades.
+- El estado **Realizada** sigue disponible en los detalles de la clase para conservar el seguimiento histórico.
+- Borrado individual desde los detalles de una clase o desde la lista. Pide confirmación, crea antes una copia local y conserva las demás sesiones de la planificación. Una sesión borrada no se vuelve a generar al editar la serie ni al restaurar la copia actual. Al borrar una clase pagada se advierte que su pago dejará de aparecer en los totales.
+- Base de datos y copias **v5**, con migración automática y copia de seguridad previa. La versión nueva restaura copias v1–v4. Los estados y las sesiones borradas se conservan al trasladar los datos.
+- **GUIA-COPIAS.md** explica cómo descargar una copia, recuperar un borrado o pasar los datos a otro PC. También hay instrucciones dentro de Mi información. **GITHUB.md** explica cómo conservar el código y publicar sus versiones; GitHub y las copias de datos cumplen funciones distintas.
+
 ## Paquet Windows 0.4.1 — prêt pour un autre PC
 
 Le ZIP **Amapola-0.4.1-Windows.zip** contient la version actuelle, sans base de données ni sauvegarde embarquée. Extraire l'ensemble puis ouvrir **Amapola.exe**. Au premier lancement sur un PC sans données Amapola, toutes les listes sont vides. Les données de ce PC restent dans `%LOCALAPPDATA%\Amapola\datos` ; réinstaller ne supprime pas une base existante.

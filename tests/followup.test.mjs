@@ -19,7 +19,7 @@ test('prospects retain contacts and notes, convert to students and survive backu
   const {db}=fixture(t);
   const prospect=db.saveStudent({firstName:'Lucía',color:'#698f9d',stage:'prospect',channel:'instagram',phone:'+57 300 123 4567',email:'lucia@example.test',messenger:'https://m.me/lucia',notes:'Hablar el viernes https://example.test/chat'});
   assert.equal(prospect.active,0);assert.equal(prospect.stage,'prospect');
-  const archive=db.exportData();assert.equal(archive.version,4);db.importData(archive);
+  const archive=db.exportData();assert.equal(archive.version,5);db.importData(archive);
   assert.equal(db.get('students',prospect.id).messenger,prospect.messenger);
   assert.equal(db.get('students',prospect.id).stage,'prospect');
   assert.equal(db.get('students',prospect.id).channel,'instagram');
@@ -92,7 +92,7 @@ test('a v3 upgrade backs up busy blocks and contacts before adding student follo
     db=new Store(file);const student=db.saveStudent({firstName:'Antes',color:'#bc587a'});
     db.saveBusyBlock({date,time:'15:00',duration:30,title:'Pausa'});
     db.db.exec('ALTER TABLE students DROP COLUMN stage; PRAGMA user_version=3;');db.close();db=new Store(file);
-    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,4);
+    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,5);
     assert.equal(db.get('students',student.id).stage,'student');assert.equal(db.all('busy_blocks').length,1);
     const fileName=readdirSync(path.join(dir,'copias')).find(n=>n.includes('antes-de-actualizar'));
     const archive=JSON.parse(gunzipSync(readFileSync(path.join(dir,'copias',fileName))));

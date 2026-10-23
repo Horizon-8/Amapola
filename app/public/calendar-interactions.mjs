@@ -63,7 +63,7 @@ export function attachCalendarGestures(root, { rows, onCreate, onChange }) {
     frame = requestAnimationFrame(autoScroll);
   }
   root.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || drag || event.target.closest('[data-action="payment"]')) return;
+    if (event.button !== 0 || drag || event.target.closest('[data-action="payment"],[data-action="class-status"]')) return;
     const lane = event.target.closest('.day-lane'); if (!lane) return;
     const element = event.target.closest('.calendar-event');
     const row = element && rows.find(r => r.id === element.dataset.id);

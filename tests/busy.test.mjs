@@ -28,7 +28,7 @@ test('busy blocks never become lessons, payments or estimated income and survive
   const db=new Store(':memory:');t.after(()=>db.close());const date=addDays(todayIn(defaults.timezone),1);
   const block=db.saveBusyBlock({date,time:'09:00',duration:120,title:'Descanso',notes:'Personal'});
   assert.equal(db.occurrences(date,date).length,0);assert.equal(db.classLedger({period:'all'}).total,0);assert.equal(db.report(date).current.total,0);
-  const archive=db.exportData();assert.equal(archive.version,4);assert.equal(archive.busy_blocks.length,1);
+  const archive=db.exportData();assert.equal(archive.version,5);assert.equal(archive.busy_blocks.length,1);
   db.deleteBusyBlock(block.id);db.importData(archive);assert.equal(db.get('busy_blocks',block.id).notes,'Personal');
   assert.throws(()=>db.savePayment({paymentStatus:'paid',paymentMethod:'cash'},block.id),/no encontrado/);
   const invalid=structuredClone(archive);invalid.busy_blocks[0].duration=17;assert.throws(()=>db.importData(invalid));
@@ -40,7 +40,7 @@ test('v2 databases migrate with their previous backup format and preserve studen
   try {
     db=new Store(file);const student=db.saveStudent({firstName:'Existente',color:'#bc587a'});
     db.db.exec('DROP TABLE busy_blocks; PRAGMA user_version=2;');db.close();db=new Store(file);
-    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,4);
+    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,5);
     assert.equal(db.get('students',student.id).firstName,'Existente');assert.equal(db.all('busy_blocks').length,0);
     const files=readdirSync(path.join(dir,'copias'));assert.equal(files.length,1);
     const old=JSON.parse(gunzipSync(readFileSync(path.join(dir,'copias',files[0]))));assert.equal(old.version,2);assert.equal(old.busy_blocks,undefined);

@@ -1,10 +1,12 @@
-# Amapola 0.4.1 — installation sur un autre PC
+# Amapola 0.5.0 — installation sur un autre PC
+
+Cette version est en phase de tests dans le dossier du projet. Le ZIP 0.5.0 sera généré après validation ; le ZIP 0.4.1 reste l’ancienne distribution.
 
 ## Démarrer avec zéro donnée
 
-1. Copiez `Amapola-0.4.1-Windows.zip` sur l'autre PC Windows 10/11 64 bits.
+1. Copiez `Amapola-0.5.0-Windows.zip` sur l'autre PC Windows 10/11 64 bits.
 2. Faites **Extraire tout** dans un dossier permanent, par exemple `Documents\Amapola`. Conservez toutes les sous-dossiers avec `Amapola.exe`.
-3. Ouvrez **Amapola.exe**. Le navigateur affiche l'application ; le pied de page doit indiquer **v0.4.1**.
+3. Ouvrez **Amapola.exe**. Le navigateur affiche l'application ; le pied de page doit indiquer **v0.5.0**.
 4. Au premier lancement sur un PC sans données Amapola, les élèves, contacts potentiels, planifications, classes, paiements et blocs d'indisponibilité sont vides. Aucun compte de démonstration n'est créé.
 5. Facultatif : lancez `Crear-acceso-directo.vbs` pour créer un raccourci sur le bureau.
 
@@ -36,6 +38,8 @@ Les prochaines séances récurrentes sont régénérées à partir des planifica
 4. La restauration remplace les données de ce PC par celles de la sauvegarde. Amapola crée d'abord une copie de sécurité des données remplacées.
 5. Si vous utilisez un dossier de sauvegarde synchronisé, vérifiez son chemin sur le nouveau PC : il peut être différent.
 
-Les sauvegardes créées par les anciennes versions v1, v2 et v3 restent lisibles. Le format actuel est v4. La restauration complète sur une base vide a été testée avec les contacts potentiels, tous les moyens de paiement, les exceptions de calendrier et les réglages.
+Les sauvegardes créées par les anciennes versions v1, v2, v3 et v4 restent lisibles. Le format actuel est v5. La restauration complète sur une base vide a été testée avec les contacts potentiels, tous les moyens de paiement, les exceptions de calendrier et les réglages.
 
 Pour quitter, utilisez **Cerrar aplicación**. Fermer seulement l'onglet laisse l'application en arrière-plan.
+
+Le guide espagnol détaillé est GUIA-COPIAS.md. Les états Confirmée/À confirmer/Annulée et les suppressions individuelles sont inclus dans les copies v5. Une copie v5 nécessite Amapola 0.5.0 ou une version compatible sur le PC de destination.

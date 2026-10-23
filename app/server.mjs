@@ -11,7 +11,7 @@ import { Backups } from './backup.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.4.1';
+export const appVersion = '0.5.0';
 const buildHash = createHash('sha256');
 for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'public/class-utils.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');
@@ -139,10 +139,10 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
         try { await backups.snapshot('antes-de-eliminar'); store.deleteBusyBlock(decodeURIComponent(busyMatch[1])); backups.schedule(); return send(res,200,{ok:true}); }
         finally { destructiveBusy=false; }
       }
-      const sessionAction = route.match(/^\/api\/sessions\/([^/]+)\/(payment|change)$/);
+      const sessionAction = route.match(/^\/api\/sessions\/([^/]+)\/(payment|change|status)$/);
       if (sessionAction && method === 'PUT') {
         const value = await body(req), sessionId = decodeURIComponent(sessionAction[1]);
-        const row = sessionAction[2] === 'payment' ? store.savePayment(value, sessionId) : store.changeSession(value, sessionId);
+        const row = sessionAction[2] === 'payment' ? store.savePayment(value, sessionId) : sessionAction[2] === 'status' ? store.saveSessionStatus(value, sessionId) : store.changeSession(value, sessionId);
         backups.schedule(); return send(res, 200, row);
       }
       if (route === '/api/students' && method === 'POST') { const row = store.saveStudent(await body(req)); backups.schedule(); return send(res, 201, row); }
@@ -158,12 +158,12 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
           if (table === 'sessions') row = store.saveSession(v, recordId);
           backups.schedule(); return send(res, 200, row);
         }
-        if (method === 'DELETE' && table !== 'sessions') {
+        if (method === 'DELETE') {
           const v = await body(req); if (v.confirm !== true) throw new AppError('Confirma la eliminación.');
           destructiveBusy = true;
           try {
             await backups.snapshot('antes-de-eliminar');
-            if (table === 'students') store.deleteStudent(recordId); else store.deleteSchedule(recordId);
+            if (table === 'students') store.deleteStudent(recordId); else if (table === 'sessions') store.deleteSession(recordId); else store.deleteSchedule(recordId);
             backups.schedule(); return send(res, 200, { ok: true });
           } finally { destructiveBusy = false; }
         }

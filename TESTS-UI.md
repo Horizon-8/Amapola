@@ -1,4 +1,17 @@
-# Pruebas de la versión 0.4.1 — colores y calendario compacto
+# Pruebas de la versión 0.5.0 — estados y borrado individual
+
+Abre **Amapola.exe del proyecto** y comprueba **v0.5.0** al pie. El ZIP 0.4.1 sigue siendo la distribución anterior.
+
+1. En Semana y Agenda, pulsa el botón de estado situado junto al pago: debe pasar de ? Por confirmar a ✓ Confirmada, después × Cancelada y otra vez ? Por confirmar. Comprueba que las demás clases de la serie mantienen su estado y que el pago no cambia.
+2. Pulsa el botón de pago después de confirmar una clase. Registra el método y comprueba que queda pagada y confirmada. Cancela y vuelve a confirmar: el pago debe conservarse.
+3. En los detalles, cambia directamente el estado y comprueba que sigue existiendo Realizada. Filtra las clases por Confirmada en la lista global.
+4. Cancela una sesión, crea otra clase o un bloque Ocupada en ese horario y reactiva la primera: debe avisar del solapamiento antes de ocuparlo.
+5. Abre una clase y pulsa Eliminar esta sesión, o usa la papelera de su fila en Clases. Cancela la confirmación una vez: no se debe borrar. Después confirma: desaparece solo esa sesión y las siguientes se conservan. Comprueba una clase futura, una pasada y una pagada.
+6. Mueve o cambia la planificación después de borrar una sesión. No debe reaparecer. Cierra y abre Amapola; descarga y restaura una copia actual: seguirá eliminada.
+7. Para recuperar el borrado, descarga la copia Antes de un cambio creada antes de eliminar y restáurala. Deben recuperarse clase, estado y pago anteriores. La restauración afecta a todos los datos, no solo a esa clase.
+8. En Mi información revisa las instrucciones de copia. No hace falta cambiar fechas para descargar una copia. Prueba la restauración en otra instalación con versión 0.5.0 o compatible.
+
+## Pruebas anteriores: colores y calendario compacto (0.4.1)
 
 Abrir **Amapola.exe del proyecto**. El pie de página debe mostrar **v0.4.1**.
 

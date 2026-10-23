@@ -41,6 +41,8 @@ test('a downloaded backup restores every business field on a clean PC, including
     source.saveSession({...futureException,time:'18:00',notes:'Excepción futura que debe conservarse.'},futureException.id);
     const split=source.changeSession({...selected,date:addDays(anchor,1),time:'12:30',duration:60,scope:'following',paymentStatus:'paid',paymentMethod:'transfer'},selected.id);
     const nextRule=source.get('schedules',split.newScheduleId);
+    source.saveSessionStatus({status:'confirmed'},split.id);
+    const removed=source.projected(nextRule,addDays(nextRule.startDate,21));source.deleteSession(removed.id);
     let weeks=4;
     for(const method of paymentMethods.filter(Boolean)) {
       const occurrence=source.projected(nextRule,addDays(nextRule.startDate,7*weeks++));
@@ -53,7 +55,7 @@ test('a downloaded backup restores every business field on a clean PC, including
     const copy=await new Backups(source,sourceDir).snapshot();
     const downloaded=await new Backups(source,sourceDir).read(copy.filename);
     const decoded=decodeArchive(downloaded),raw=JSON.parse(gunzipSync(downloaded));
-    assert.equal(raw.version,4);
+    assert.equal(raw.version,5);
     assert.deepEqual(decoded.students.find(row=>row.id===prospect.id).notes,prospect.notes);
     const expected=data(source);
     source.close();source=null;
@@ -64,6 +66,8 @@ test('a downloaded backup restores every business field on a clean PC, including
     assert.equal(target.get('students',prospect.id).stage,'prospect');
     assert.equal(target.get('students',prospect.id).channel,'instagram');
     assert.equal(target.get('students',inactive.id).active,0);
+    assert.equal(target.get('sessions',split.id).status,'confirmed');
+    assert.equal(target.occurrences(removed.date,removed.date).some(row=>row.scheduleId===nextRule.id),false);
     assert.deepEqual(new Set(target.all('sessions').filter(row=>row.paymentStatus==='paid').map(row=>row.paymentMethod)),new Set(paymentMethods.filter(Boolean)));
     target.close();target=new Store(path.join(targetDir,'amapola.sqlite'));
     assert.deepEqual(data(target),expected);

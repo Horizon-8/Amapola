@@ -23,6 +23,30 @@ function transport(app) {
     return {code,headers:output,bytes:body,json:()=>JSON.parse(body.toString()),text:()=>body.toString()};
   };
 }
+test('HTTP status and single-session deletion preserve payment, require confirmation and create a restorable safety copy',async t=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-session-actions-')),app=await startApp({dataDir:dir,port:0});
+  t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
+  const request=transport(app),index=await request('/'),cookie=index.headers['set-cookie'].split(';')[0];
+  const boot=(await request('/api/bootstrap',{headers:{Cookie:cookie}})).json(),headers={Cookie:cookie,Origin:app.url,'Content-Type':'application/json','X-Amapola-Token':boot.csrf};
+  const student=app.store.saveStudent({firstName:'Ana',color:'#bc587a'}),date=addDays(todayIn(defaults.timezone),3);
+  const rule=app.store.saveSchedule({studentId:student.id,title:'Clase',startDate:date,weekday:weekday(date),time:'10:00',duration:60,price:50000});
+  const row=app.store.projected(rule,date),url=`/api/sessions/${encodeURIComponent(row.id)}`;
+  app.store.savePayment({paymentStatus:'paid',paymentMethod:'cash'},row.id);
+  assert.equal((await request(`${url}/status`,{method:'PUT',data:{status:'confirmed'}})).code,401);
+  const confirmed=await request(`${url}/status`,{method:'PUT',headers,data:{status:'confirmed',expectedStatus:'planned'}});
+  assert.equal(confirmed.code,200);assert.equal(confirmed.json().paymentStatus,'paid');assert.equal(confirmed.json().paymentMethod,'cash');
+  assert.equal((await request(`${url}/status`,{method:'PUT',headers,data:{status:'cancelled',expectedStatus:'planned'}})).code,409);
+  assert.equal((await request(url,{method:'DELETE',headers,data:{}})).code,400);
+  assert.equal(app.store.occurrences(date,date).length,1);
+  assert.equal((await request(url,{method:'DELETE',headers,data:{confirm:true}})).code,200);
+  assert.equal(app.store.occurrences(date,date).length,0);assert.equal(app.store.occurrences(addDays(date,7),addDays(date,7)).length,1);
+  assert.equal((await request(`${url}/status`,{method:'PUT',headers,data:{status:'confirmed'}})).code,404);
+  const files=(await request('/api/backups',{headers})).json().files,safety=files.find(f=>f.filename.includes('antes-de-eliminar'));assert.ok(safety);
+  const bytes=(await request(`/api/backups/file/${safety.filename}`,{headers})).bytes,payload=JSON.parse(gunzipSync(bytes));
+  assert.equal(payload.sessions[0].status,'confirmed');assert.equal(payload.sessions[0].isDeleted,0);assert.equal(payload.sessions[0].paymentMethod,'cash');
+  const restored=await request('/api/restore',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},bytes});
+  assert.equal(restored.code,200);assert.equal(app.store.occurrences(date,date)[0].status,'confirmed');
+});
 test('HTTP follow-up and overlap previews preserve data and use normal session authentication',async t=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-followup-routes-')),app=await startApp({dataDir:dir,port:0});
   t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
@@ -79,7 +103,7 @@ test('HTTP handler connects class lists, payment changes, scoped calendar change
   const local=await request('/api/backups/local',{method:'POST',headers,data:{}});assert.equal(local.code,200);
   const downloaded=await request(`/api/backups/file/${local.json().filename}`,{headers});assert.equal(downloaded.code,200,downloaded.text());
   const archive=downloaded.bytes;
-  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,4);assert.equal(payload.sessions[0].paymentMethod,'cash');
+  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,5);assert.equal(payload.sessions[0].paymentMethod,'cash');
   await mutate(`/api/sessions/${next.id}/payment`,{paymentStatus:'unpaid',paymentMethod:''});
   const restored=await request('/api/restore',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},bytes:archive});assert.equal(restored.code,200);
   assert.equal(app.store.get('sessions',next.id).paymentStatus,'paid');

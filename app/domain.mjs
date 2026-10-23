@@ -94,6 +94,19 @@ export function busyInput(v) {
   return { title: text(v.title ?? 'Ocupada', 'Título', 150, true), date, time, duration, notes: text(v.notes ?? '', 'Notas', 4000) };
 }
 
+export const classStatuses = ['planned', 'confirmed', 'completed', 'cancelled'];
+const sessionSchema = `CREATE TABLE IF NOT EXISTS sessions (
+ id TEXT PRIMARY KEY, scheduleId TEXT REFERENCES schedules(id) ON DELETE SET NULL,
+ originalDate TEXT NOT NULL, studentId TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+ title TEXT NOT NULL, date TEXT NOT NULL, time TEXT NOT NULL, duration INTEGER NOT NULL,
+ price INTEGER NOT NULL CHECK(price>=0), modality TEXT NOT NULL, notes TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('planned','confirmed','completed','cancelled')),
+ paymentStatus TEXT NOT NULL DEFAULT 'unpaid' CHECK(paymentStatus IN ('unpaid','paid')),
+ paymentMethod TEXT NOT NULL DEFAULT '',
+ isOverride INTEGER NOT NULL DEFAULT 0 CHECK(isOverride IN (0,1)),
+ isDeleted INTEGER NOT NULL DEFAULT 0 CHECK(isDeleted IN (0,1)),
+ UNIQUE(scheduleId, originalDate));`;
+
 const schema = `
 CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS students (
@@ -107,16 +120,7 @@ CREATE TABLE IF NOT EXISTS schedules (
  price INTEGER NOT NULL CHECK(price>=0), modality TEXT NOT NULL, notes TEXT NOT NULL,
  startDate TEXT NOT NULL, endDate TEXT NOT NULL, weekday INTEGER NOT NULL CHECK(weekday BETWEEN 0 AND 6),
  recurrence TEXT NOT NULL, active INTEGER NOT NULL CHECK(active IN (0,1)));
-CREATE TABLE IF NOT EXISTS sessions (
- id TEXT PRIMARY KEY, scheduleId TEXT REFERENCES schedules(id) ON DELETE SET NULL,
- originalDate TEXT NOT NULL, studentId TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
- title TEXT NOT NULL, date TEXT NOT NULL, time TEXT NOT NULL, duration INTEGER NOT NULL,
- price INTEGER NOT NULL CHECK(price>=0), modality TEXT NOT NULL, notes TEXT NOT NULL,
- status TEXT NOT NULL CHECK(status IN ('planned','completed','cancelled')),
- paymentStatus TEXT NOT NULL DEFAULT 'unpaid' CHECK(paymentStatus IN ('unpaid','paid')),
- paymentMethod TEXT NOT NULL DEFAULT '',
- isOverride INTEGER NOT NULL DEFAULT 0 CHECK(isOverride IN (0,1)),
- UNIQUE(scheduleId, originalDate));
+${sessionSchema}
 CREATE INDEX IF NOT EXISTS sessions_date ON sessions(date);
 CREATE INDEX IF NOT EXISTS schedules_student ON schedules(studentId);
 CREATE TABLE IF NOT EXISTS busy_blocks (
@@ -127,7 +131,7 @@ CREATE INDEX IF NOT EXISTS busy_blocks_date ON busy_blocks(date);
 const tableCols = {
   students: ['id', 'firstName', 'lastName', 'channel', 'phone', 'email', 'messenger', 'notes', 'color', 'active', 'createdAt', 'stage'],
   schedules: ['id', 'studentId', 'title', 'time', 'duration', 'price', 'modality', 'notes', 'startDate', 'endDate', 'weekday', 'recurrence', 'active'],
-  sessions: ['id', 'scheduleId', 'originalDate', 'studentId', 'title', 'date', 'time', 'duration', 'price', 'modality', 'notes', 'status', 'paymentStatus', 'paymentMethod', 'isOverride'],
+  sessions: ['id', 'scheduleId', 'originalDate', 'studentId', 'title', 'date', 'time', 'duration', 'price', 'modality', 'notes', 'status', 'paymentStatus', 'paymentMethod', 'isOverride', 'isDeleted'],
   busy_blocks: ['id', 'title', 'date', 'time', 'duration', 'notes'],
 };
 export class Store {
@@ -135,9 +139,9 @@ export class Store {
     this.db = new DatabaseSync(file);
     this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
     const version = this.db.prepare('PRAGMA user_version').get().user_version;
-    if (version > 4) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
+    if (version > 5) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
     try {
-      if ([1, 2, 3].includes(version) && file !== ':memory:') {
+      if ([1, 2, 3, 4].includes(version) && file !== ':memory:') {
         const dir = path.join(path.dirname(file), 'copias'); mkdirSync(dir, { recursive: true });
         const payload = { app: 'amapola', version, createdAt: new Date().toISOString(), settings: this.settings(), students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions') };
         if (version >= 3) payload.busy_blocks = this.all('busy_blocks');
@@ -149,9 +153,17 @@ export class Store {
         if (!columns.has('paymentStatus')) this.db.exec("ALTER TABLE sessions ADD COLUMN paymentStatus TEXT NOT NULL DEFAULT 'unpaid' CHECK(paymentStatus IN ('unpaid','paid'));");
         if (!columns.has('paymentMethod')) this.db.exec("ALTER TABLE sessions ADD COLUMN paymentMethod TEXT NOT NULL DEFAULT '';");
         if (!columns.has('isOverride')) this.db.exec('ALTER TABLE sessions ADD COLUMN isOverride INTEGER NOT NULL DEFAULT 1 CHECK(isOverride IN (0,1));');
+        if (!columns.has('isDeleted')) this.db.exec('ALTER TABLE sessions ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0 CHECK(isDeleted IN (0,1));');
+        const definition = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'").get().sql;
+        if (!definition.includes("'confirmed'")) {
+          const cols = tableCols.sessions.join(',');
+          this.db.exec(`ALTER TABLE sessions RENAME TO sessions_legacy; ${sessionSchema}
+            INSERT INTO sessions (${cols}) SELECT ${cols} FROM sessions_legacy;
+            DROP TABLE sessions_legacy; CREATE INDEX sessions_date ON sessions(date);`);
+        }
         const studentColumns = new Set(this.db.prepare('PRAGMA table_info(students)').all().map(c => c.name));
         if (!studentColumns.has('stage')) this.db.exec("ALTER TABLE students ADD COLUMN stage TEXT NOT NULL DEFAULT 'student' CHECK(stage IN ('student','prospect'));");
-        this.db.exec('PRAGMA user_version=4;');
+        this.db.exec('PRAGMA user_version=5;');
       });
     } catch (error) { this.db.close(); throw error; }
     this.db.prepare('INSERT OR IGNORE INTO settings(id,json) VALUES(1,?)').run(JSON.stringify(defaults));
@@ -182,7 +194,7 @@ export class Store {
     return dates;
   }
   projected(s, date) { return { id: `${s.id}@${date}`, scheduleId: s.id, originalDate: date, studentId: s.studentId, title: s.title,
-    date, time: s.time, duration: s.duration, price: s.price, modality: s.modality, notes: s.notes, status: 'planned', paymentStatus: 'unpaid', paymentMethod: '', isOverride: 0, virtual: true }; }
+    date, time: s.time, duration: s.duration, price: s.price, modality: s.modality, notes: s.notes, status: 'planned', paymentStatus: 'unpaid', paymentMethod: '', isOverride: 0, isDeleted: 0, virtual: true }; }
   decorate(row, now = new Date()) {
     const config = this.settings(), today = todayIn(config.timezone, now), time = timeIn(config.timezone, now);
     return { ...row, isPast: hasEnded(row, today, time), paymentState: paymentState(row, today, time) };
@@ -208,7 +220,7 @@ export class Store {
     const keys = new Set(stored.filter(s => s.scheduleId).map(s => `${s.scheduleId}@${s.originalDate}`));
     const students = new Map(this.all('students').map(s => [s.id, s]));
     const config = this.settings(), today = todayIn(config.timezone);
-    const rows = stored.filter(s => s.date >= from && s.date <= to && (!studentId || s.studentId === studentId));
+    const rows = stored.filter(s => !s.isDeleted && s.date >= from && s.date <= to && (!studentId || s.studentId === studentId));
     for (const s of this.all('schedules')) {
       if (!students.get(s.studentId)?.active || (studentId && s.studentId !== studentId)) continue;
       for (const d of this.scheduleDates(s, from > today ? from : today, to)) if (!keys.has(`${s.id}@${d}`)) rows.push(this.projected(s, d));
@@ -251,6 +263,7 @@ export class Store {
         old = { ...this.projected(s, original), id: randomUUID() };
       }
     } else old = this.get('sessions', id);
+    if (old.isDeleted) throw new AppError('Esta sesión se ha eliminado. Actualiza la página.', 404);
     return old;
   }
   persistSession(old, data) {
@@ -259,7 +272,7 @@ export class Store {
   }
   saveSession(v, id) {
     const old = this.resolveSession(id);
-    const data = { ...classInput(v), date: dateValue(v.date), status: choice(v.status, ['planned', 'completed', 'cancelled'], 'Estado'),
+    const data = { ...classInput(v), date: dateValue(v.date), status: choice(v.status, classStatuses, 'Estado'),
       ...paymentInput({ ...old, ...v }) };
     data.isOverride = ['title', 'date', 'time', 'duration', 'price', 'modality', 'notes'].some(key => data[key] !== old[key]) ? 1 : old.isOverride;
     this.get('students', data.studentId);
@@ -269,6 +282,19 @@ export class Store {
   savePayment(v, id) {
     const old = this.resolveSession(id);
     return this.persistSession(old, paymentInput(v));
+  }
+  saveSessionStatus(v, id) {
+    const old = this.resolveSession(id);
+    const status = choice(v.status, classStatuses, 'Estado');
+    if (v.expectedStatus !== undefined && choice(v.expectedStatus, classStatuses, 'Estado anterior') !== old.status) throw new AppError('El estado cambió en otra vista. Actualiza la página antes de continuar.', 409);
+    return this.persistSession(old, { status });
+  }
+  deleteSession(id) {
+    return this.transaction(() => {
+      const old = this.resolveSession(id);
+      // Keep the occurrence key so a recurring rule cannot generate it again.
+      return this.persistSession(old, { isDeleted: 1, isOverride: 1 });
+    });
   }
   changeSession(v, id) {
     const scope = choice(v.scope, ['session', 'following'], 'Alcance del cambio');
@@ -291,11 +317,11 @@ export class Store {
       for (const row of this.all('sessions').filter(r => r.scheduleId === rule.id && r.originalDate >= old.originalDate && r.id !== old.id)) {
         const originalDate = addDays(row.originalDate, shift);
         const changes = { scheduleId: next.id, originalDate };
-        if (!row.isOverride && row.status === 'planned') Object.assign(changes, data, { date: originalDate });
+        if (!row.isDeleted && !row.isOverride && ['planned','confirmed'].includes(row.status)) Object.assign(changes, data, { date: originalDate });
         this.update('sessions', row.id, changes);
       }
       const selected = this.persistSession(old, { ...data, date, scheduleId: next.id, originalDate: date,
-        status: choice(v.status ?? old.status, ['planned', 'completed', 'cancelled'], 'Estado'), ...paymentInput({ ...old, ...v }), isOverride: 0 });
+        status: choice(v.status ?? old.status, classStatuses, 'Estado'), ...paymentInput({ ...old, ...v }), isOverride: 0 });
       return { ...selected, newScheduleId: next.id };
     });
   }
@@ -344,13 +370,13 @@ export class Store {
         const from = rule.startDate;
         if (students.get(rule.studentId)?.active) targets = this.scheduleDates(rule, from, '2100-12-31')
           .filter(d => !keys.has(`${rule.id}@${d}`)).map(d => this.projected(rule, d));
-        if (kind === 'session') targets.push(...stored.filter(s => s.scheduleId === rule.id && (s.id === changed.id || (!s.isOverride && s.status === 'planned'))));
+        if (kind === 'session') targets.push(...stored.filter(s => s.scheduleId === rule.id && (s.id === changed.id || (!s.isOverride && ['planned','confirmed'].includes(s.status)))));
       }
-      targets = targets.filter(s => s.status !== 'cancelled');
+      targets = targets.filter(s => !s.isDeleted && s.status !== 'cancelled');
       if (!targets.length) return { conflicts: [], total: 0, recurring: !!rule };
       const from = targets.reduce((d,s) => s.date < d ? s.date : d, targets[0].date);
       const to = targets.reduce((d,s) => s.date > d ? s.date : d, from);
-      const events = stored.filter(s => s.date >= from && s.date <= to && s.status !== 'cancelled');
+      const events = stored.filter(s => !s.isDeleted && s.date >= from && s.date <= to && s.status !== 'cancelled');
       for (const s of this.all('schedules')) {
         if (!students.get(s.studentId)?.active) continue;
         for (const d of this.scheduleDates(s, from > today ? from : today, to)) {
@@ -387,12 +413,12 @@ export class Store {
   history(studentId) {
     this.get('students', studentId); this.freezePast();
     const config = this.settings(), today = todayIn(config.timezone), time = timeIn(config.timezone);
-    return this.db.prepare('SELECT * FROM sessions WHERE studentId=? ORDER BY date DESC,time DESC').all(studentId).filter(r => hasEnded(r, today, time)).map(r => this.decorate(r));
+    return this.db.prepare('SELECT * FROM sessions WHERE studentId=? AND isDeleted=0 ORDER BY date DESC,time DESC').all(studentId).filter(r => hasEnded(r, today, time)).map(r => this.decorate(r));
   }
   classLedger(options = {}) {
     const period = choice(options.period ?? 'past', ['past', 'future', 'all'], 'Periodo');
     const payment = choice(options.payment ?? 'all', ['all', 'paid', 'unpaid', 'overdue', 'pending'], 'Pago');
-    const status = choice(options.status ?? '', ['', 'planned', 'completed', 'cancelled'], 'Estado');
+    const status = choice(options.status ?? '', ['', ...classStatuses], 'Estado');
     const method = choice(options.method ?? '', paymentMethods, 'Método de pago');
     const today = todayIn(this.settings().timezone), from = options.from ? dateValue(options.from) : '', to = options.to ? dateValue(options.to) : '';
     if (from && to && from > to) throw new AppError('La fecha final debe ser posterior al inicio.');
@@ -400,7 +426,7 @@ export class Store {
     if (horizon > addDays(today, 370)) throw new AppError('Las clases futuras se pueden consultar hasta un año por adelantado.');
     const current = this.occurrences(today, horizon);
     const students = new Map(this.all('students').map(s => [s.id, s]));
-    const previous = this.all('sessions').filter(r => r.date < today).map(r => ({ ...this.decorate(r), studentName: `${students.get(r.studentId)?.firstName ?? ''} ${students.get(r.studentId)?.lastName ?? ''}`.trim(), color: students.get(r.studentId)?.color }));
+    const previous = this.all('sessions').filter(r => !r.isDeleted && r.date < today).map(r => ({ ...this.decorate(r), studentName: `${students.get(r.studentId)?.firstName ?? ''} ${students.get(r.studentId)?.lastName ?? ''}`.trim(), color: students.get(r.studentId)?.color }));
     let rows = [...previous, ...current].filter(r => (period === 'all' || (period === 'past' ? r.isPast : !r.isPast)) && (!from || r.date >= from) && (!to || r.date <= to)
       && (!options.student || r.studentId === options.student) && (!method || r.paymentMethod === method) && (!status || r.status === status)
       && (payment === 'all' || (payment === 'unpaid' ? r.paymentStatus !== 'paid' && r.paymentState !== 'nocharge' : r.paymentState === payment)));
@@ -429,7 +455,7 @@ export class Store {
   }
   exportData() {
     this.freezePast();
-    return this.transaction(() => ({ app: 'amapola', version: 4, createdAt: new Date().toISOString(), settings: this.settings(),
+    return this.transaction(() => ({ app: 'amapola', version: 5, createdAt: new Date().toISOString(), settings: this.settings(),
       students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions'), busy_blocks: this.all('busy_blocks') }));
   }
   importData(raw) {
@@ -443,7 +469,7 @@ export class Store {
   close() { this.db.close(); }
 }
 export function validateArchive(raw) {
-  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
+  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
   const data = { settings: settingsInput(raw.settings), students: [], schedules: [], sessions: [], busy_blocks: [] };
   if (raw.version < 3) raw = { ...raw, busy_blocks: [] };
   const ids = {}, max = { students: 100000, schedules: 200000, sessions: 500000, busy_blocks: 100000 };
@@ -460,7 +486,7 @@ export function validateArchive(raw) {
       if (table === 'schedules') entry = { ...scheduleInput({ ...row, active: !!row.active }, { strictTime: false }), id };
       if (table === 'sessions') entry = { ...classInput(row, { strictTime: false }), ...paymentInput(raw.version === 1 ? {} : row), isOverride: raw.version === 1 ? 1 : integer(row.isOverride, 0, 1, 'Excepción'), id, date: dateValue(row.date), originalDate: dateValue(row.originalDate),
         scheduleId: row.scheduleId === null ? null : text(row.scheduleId, 'Planificación', 50, true),
-        status: choice(row.status, ['planned', 'completed', 'cancelled'], 'Estado') };
+        status: choice(row.status, classStatuses, 'Estado'), isDeleted: raw.version < 5 ? 0 : integer(row.isDeleted, 0, 1, 'Sesión eliminada') };
       data[table].push(entry);
     }
   }

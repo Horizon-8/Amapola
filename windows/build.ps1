@@ -21,5 +21,5 @@ New-Item -ItemType Directory -Path $release -Force | Out-Null
 $packageVersion = (Get-Content -LiteralPath (Join-Path $project 'package.json') -Raw | ConvertFrom-Json).version
 $zip = Join-Path $release "Amapola-$packageVersion-Windows.zip"
 # Explicit allowlist: never ship development databases, test students or logs.
-Compress-Archive -LiteralPath (Join-Path $project 'app'), (Join-Path $project 'runtime'), (Join-Path $project 'windows'), (Join-Path $project 'tests'), (Join-Path $project 'Amapola.exe'), (Join-Path $project 'Crear-acceso-directo.vbs'), (Join-Path $project 'LEEME.html'), (Join-Path $project 'README.md'), (Join-Path $project 'TESTS-UI.md'), (Join-Path $project 'INSTALLATION-FR.md'), (Join-Path $project 'package.json') -DestinationPath $zip -Force
+Compress-Archive -LiteralPath (Join-Path $project 'app'), (Join-Path $project 'runtime'), (Join-Path $project 'windows'), (Join-Path $project 'tests'), (Join-Path $project 'Amapola.exe'), (Join-Path $project 'Crear-acceso-directo.vbs'), (Join-Path $project 'LEEME.html'), (Join-Path $project 'README.md'), (Join-Path $project 'TESTS-UI.md'), (Join-Path $project 'INSTALLATION-FR.md'), (Join-Path $project 'GUIA-COPIAS.md'), (Join-Path $project 'GITHUB.md'), (Join-Path $project 'package.json') -DestinationPath $zip -Force
 Write-Output $zip

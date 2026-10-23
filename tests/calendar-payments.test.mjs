@@ -45,7 +45,7 @@ test('payments belong to exactly one occurrence, survive moves and round-trip th
   assert.equal(rows.find(r=>r.paymentStatus==='paid').paymentMethod,'nequi');
   assert.equal(rows.find(r=>r.date===addDays(date,7)).time,'10:00');
   assert.equal(rows.filter(r=>r.date===date).length,0);
-  const archive=db.exportData();assert.equal(archive.version,4);db.importData(archive);
+  const archive=db.exportData();assert.equal(archive.version,5);db.importData(archive);
   assert.equal(db.all('sessions')[0].paymentMethod,'nequi');
   assert.equal(db.get('schedules',rule.id).time,'10:00');
 });
@@ -97,7 +97,7 @@ test('v1 databases migrate with a safety copy; old off-grid times and backups re
     db.freezePast();
     db.db.exec("UPDATE sessions SET time='08:03',duration=17; ALTER TABLE sessions DROP COLUMN paymentStatus; ALTER TABLE sessions DROP COLUMN paymentMethod; ALTER TABLE sessions DROP COLUMN isOverride; PRAGMA user_version=1;");
     db.close();db=new Store(file);
-    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,4);
+    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,5);
     assert.equal(db.all('sessions')[0].paymentStatus,'unpaid');assert.equal(db.all('sessions')[0].time,'08:03');
     const copies=readdirSync(path.join(dir,'copias'));assert.equal(copies.length,1);
     const archive=JSON.parse(gunzipSync(readFileSync(path.join(dir,'copias',copies[0]))));assert.equal(archive.version,1);
