@@ -1,14 +1,14 @@
-# Amapola 0.5.0 — installation sur un autre PC
+# Amapola 0.5.1 — installation sur un autre PC
 
-Cette version est en phase de tests dans le dossier du projet. Le ZIP 0.5.0 sera généré après validation ; le ZIP 0.4.1 reste l’ancienne distribution.
+Le ZIP 0.5.1 contient la version actuelle, sans données personnelles. Il inclut le nouvel icône de fleur avec un A et les indicateurs de classe/paiement lisibles pour les classes annulées.
 
 ## Démarrer avec zéro donnée
 
-1. Copiez `Amapola-0.5.0-Windows.zip` sur l'autre PC Windows 10/11 64 bits.
+1. Copiez `Amapola-0.5.1-Windows.zip` sur l'autre PC Windows 10/11 64 bits.
 2. Faites **Extraire tout** dans un dossier permanent, par exemple `Documents\Amapola`. Conservez toutes les sous-dossiers avec `Amapola.exe`.
-3. Ouvrez **Amapola.exe**. Le navigateur affiche l'application ; le pied de page doit indiquer **v0.5.0**.
+3. Ouvrez **Amapola.exe**. Le navigateur affiche l'application ; le pied de page doit indiquer **v0.5.1**.
 4. Au premier lancement sur un PC sans données Amapola, les élèves, contacts potentiels, planifications, classes, paiements et blocs d'indisponibilité sont vides. Aucun compte de démonstration n'est créé.
-5. Facultatif : lancez `Crear-acceso-directo.vbs` pour créer un raccourci sur le bureau.
+5. Lancez `Crear-acceso-directo.vbs` pour créer ou mettre à jour le raccourci du bureau avec la fleur et le A. Le même icône est intégré dans Amapola.exe.
 
 Ce ZIP contient le programme, son moteur d'exécution, ses sources, ses tests et les guides. Il ne contient aucune base de données, sauvegarde, donnée personnelle ni fichier de test généré. Node.js n'a pas besoin d'être installé séparément.
 
@@ -42,4 +42,4 @@ Les sauvegardes créées par les anciennes versions v1, v2, v3 et v4 restent lis
 
 Pour quitter, utilisez **Cerrar aplicación**. Fermer seulement l'onglet laisse l'application en arrière-plan.
 
-Le guide espagnol détaillé est GUIA-COPIAS.md. Les états Confirmée/À confirmer/Annulée et les suppressions individuelles sont inclus dans les copies v5. Une copie v5 nécessite Amapola 0.5.0 ou une version compatible sur le PC de destination.
+Le guide espagnol détaillé est GUIA-COPIAS.md. Les états Confirmée/À confirmer/Annulée et les suppressions individuelles sont inclus dans les copies v5. Une copie v5 nécessite Amapola 0.5.1 ou une version compatible sur le PC de destination.

@@ -123,7 +123,9 @@ test('calendar, ledger, profile and creation forms render payment controls and q
   }
   for(const channel of ['whatsapp','messenger','instagram'])assert.ok(context.channelHTML.includes(`channel-badge ${channel}`));
   for(const state of ['active','inactive','prospect'])assert.ok(context.statusHTML.includes(`student-status ${state}`));
-  assert.match(context.classStates[0],/aria-hidden="true">\?<\/span>/);
+  assert.match(context.classStates[0],/<span class="pill-icon" aria-hidden="true"><svg/);
+  assert.match(context.classStates[2],/<span class="pill-icon" aria-hidden="true"><svg/);
+  assert.match(context.rendered.calendar,/<span class="pill-icon" aria-hidden="true"><svg/);
   assert.match(context.classStates[1],/class-status confirmed compact/);
   assert.match(context.classStates[2],/class-status cancelled compact/);
   assert.match(context.rendered.ledger,/data-action="delete-session"/);

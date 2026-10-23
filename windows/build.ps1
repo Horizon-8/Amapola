@@ -13,7 +13,19 @@ $version = & $node --version
 if ($version -notmatch '^v24\.' -or [version]$version.TrimStart('v') -lt [version]'24.13.0') { throw 'Node.js 24.13.0 or newer in the 24.x series is required.' }
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (!(Test-Path -LiteralPath $compiler)) { throw '.NET Framework C# compiler not found.' }
-& $compiler /nologo /target:winexe /platform:anycpu /optimize+ /reference:System.Windows.Forms.dll "/out:$project\Amapola.exe" "$PSScriptRoot\Launcher.cs"
+$iconSource = Join-Path $PSScriptRoot 'Amapola.png'
+$iconPath = Join-Path $PSScriptRoot 'Amapola.ico'
+$iconCode = Join-Path $PSScriptRoot 'IconBuilder.cs'
+if (!(Test-Path -LiteralPath $iconPath) -or (Get-Item -LiteralPath $iconSource).LastWriteTimeUtc -gt (Get-Item -LiteralPath $iconPath).LastWriteTimeUtc -or (Get-Item -LiteralPath $iconCode).LastWriteTimeUtc -gt (Get-Item -LiteralPath $iconPath).LastWriteTimeUtc) {
+    $buildDir = Join-Path $project '.local'
+    New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+    $iconBuilder = Join-Path $buildDir 'IconBuilder.exe'
+    & $compiler /nologo /target:exe /optimize+ /reference:System.Drawing.dll "/out:$iconBuilder" $iconCode
+    if ($LASTEXITCODE -ne 0) { throw 'Could not compile the icon converter.' }
+    & $iconBuilder $iconSource $iconPath
+    if ($LASTEXITCODE -ne 0) { throw 'Could not create the application icon.' }
+}
+& $compiler /nologo /target:winexe /platform:anycpu /optimize+ /reference:System.Windows.Forms.dll "/win32icon:$iconPath" "/out:$project\Amapola.exe" "$PSScriptRoot\Launcher.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Could not compile the launcher.' }
 if ($LauncherOnly) { Write-Output (Join-Path $project 'Amapola.exe'); return }
 $release = Join-Path $project 'release'

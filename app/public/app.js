@@ -2,7 +2,7 @@ let attachCalendarGestures, paymentState, hasEnded;
 try {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(10000) });
   const health = await response.json();
-  if (!response.ok || health.app !== 'amapola' || health.version !== '0.5.0') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
+  if (!response.ok || health.app !== 'amapola' || health.version !== '0.5.1') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
   ({ attachCalendarGestures } = await import('./calendar-interactions.mjs'));
   ({ paymentState, hasEnded } = await import('./class-utils.mjs'));
 } catch (error) {
@@ -22,6 +22,10 @@ const icons = {
  chart:'<path d="M4 3v17h17M8 16v-5m5 5V7m5 9V4"/>',
  settings:'<path d="m9 3-.5 2-2 .9-1.9-.6-2 3.4L4 10v2l-1.4 1.3 2 3.4 1.9-.5 2 .9.5 2h4l.5-2 2-.9 1.9.5 2-3.4L20 12v-2l1.4-1.3-2-3.4-1.9.6-2-.9-.5-2z"/><circle cx="12" cy="11" r="3"/>',
  plus:'<path d="M12 5v14M5 12h14"/>', search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+ question:'<path d="M8 7a4 4 0 0 1 8 0c0 3-4 3-4 6m0 5v.1"/>',
+ cancel:'<path d="m4 4 16 16M4 20 20 4"/>',
+ checks:'<path d="m2 12 4 4L16 6m-5 10L21 6"/>',
+ dollar:'<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6m6-17v20"/>',
  left:'<path d="m14 6-6 6 6 6"/>', right:'<path d="m10 6 6 6-6 6"/>', close:'<path d="m6 6 12 12M6 18 18 6"/>',
  edit:'<path d="m16 3 5 5-12 12-6 1 1-6zM14 5l5 5"/>', trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
  online:'<rect x="4" y="3" width="16" height="13" rx="2"/><path d="M12 16v5m-5 0h10M8 12h8"/>',
@@ -141,8 +145,8 @@ const classStatusNames={planned:'Por confirmar',confirmed:'Confirmada',completed
 const nextClassStatus=status=>status==='planned'?'confirmed':status==='confirmed'||status==='completed'?'cancelled':'planned';
 function classStatusPill(row,compact=false) {
   const status=row.status||'planned',label=classStatusNames[status],next=classStatusNames[nextClassStatus(status)];
-  const symbol=status==='planned'?'?':status==='cancelled'?'×':status==='completed'?'✓✓':'✓';
-  return `<button type="button" class="class-status ${status} ${compact?'compact':''}" data-action="class-status" data-id="${esc(row.id)}" data-class-status="${status}" aria-label="Clase de ${esc(row.studentName||fullname(studentBy(row.studentId)))}: ${label}. Cambiar a ${next}" title="${label}. Clic: ${next}. Cambia solo esta sesión."><span aria-hidden="true">${symbol}</span>${compact?'':`<span>${label}</span>`}</button>`;
+  const symbol=status==='planned'?'question':status==='cancelled'?'cancel':status==='completed'?'checks':'check';
+  return `<button type="button" class="class-status ${status} ${compact?'compact':''}" data-action="class-status" data-id="${esc(row.id)}" data-class-status="${status}" aria-label="Clase de ${esc(row.studentName||fullname(studentBy(row.studentId)))}: ${label}. Cambiar a ${next}" title="${label}. Clic: ${next}. Cambia solo esta sesión."><span class="pill-icon" aria-hidden="true">${icon(symbol)}</span>${compact?'':`<span>${label}</span>`}</button>`;
 }
 async function cycleClassStatus(id,button) {
   if(button.disabled)return;
@@ -173,7 +177,7 @@ function classClock() {
 }
 function paymentPill(row,compact=false) {
   const clock=classClock(),state=paymentState(row,clock.today,clock.time),label=paymentLabels[state];
-  return `<button type="button" class="payment-pill ${state} ${compact?'compact':''}" data-action="payment" data-id="${esc(row.id)}" data-payment-state="${state}" aria-label="Pago de ${esc(row.studentName||fullname(studentBy(row.studentId)))}: ${label}. Registrar pago" title="${label} · ${paymentMethodNames[row.paymentMethod||'']}"><span aria-hidden="true">$</span>${compact?'':`<span>${label}</span>`}</button>`;
+  return `<button type="button" class="payment-pill ${state} ${compact?'compact':''}" data-action="payment" data-id="${esc(row.id)}" data-payment-state="${state}" aria-label="Pago de ${esc(row.studentName||fullname(studentBy(row.studentId)))}: ${label}. Registrar pago" title="${label} · ${paymentMethodNames[row.paymentMethod||'']}"><span class="pill-icon" aria-hidden="true">${icon('dollar')}</span>${compact?'':`<span>${label}</span>`}</button>`;
 }
 function findSession(id) { return [...(S.rows||[]),...(S.history||[])].find(r=>r.id===id); }
 function validateSlot(v) {

@@ -1,5 +1,13 @@
 # Amapola
 
+## Versión 0.5.1 — icono de Windows e indicadores legibles
+
+El ejecutable incorpora la flor con una A. El icono de Windows incluye tamaños de 16 a 256 píxeles. Para crear o actualizar el acceso directo del escritorio, ejecuta **Crear-acceso-directo.vbs** después de extraer toda la aplicación; utiliza el icono `windows/Amapola.ico`.
+
+El estado de clase y el pago utilizan iconos SVG. En las clases canceladas se tachan el nombre y el horario, mientras que los indicadores siguen legibles. La cruz de cancelación es más grande y gruesa. Las acciones y los pagos conservan su funcionamiento.
+
+El paquete portable actual es **Amapola-0.5.1-Windows.zip**, sin datos personales ni bases de datos. Se conserva el formato de copia v5.
+
 ## Versión 0.5.0 — lista para pruebas
 
 Abre **Amapola.exe del proyecto** y comprueba **v0.5.0** al pie. Todavía no se ha generado un ZIP 0.5.0.

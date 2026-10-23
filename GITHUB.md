@@ -1,6 +1,6 @@
 # Historial de versiones y copia del código
 
-El proyecto tiene un historial Git local preparado con una versión de referencia **v0.4.1** y la actualización **v0.5.0**. Las bases de datos, copias `.amapola`, credenciales, archivos temporales, ejecutables y ZIP están excluidos. Los ejemplos que aparecen en los tests son datos sintéticos que solo se crean al ejecutar esos tests.
+El proyecto tiene un historial Git local preparado con las versiones **v0.4.1**, **v0.5.0** y **v0.5.1**. Las bases de datos, copias `.amapola`, credenciales, archivos temporales, ejecutables y ZIP están excluidos. Los ejemplos que aparecen en los tests son datos sintéticos que solo se crean al ejecutar esos tests.
 
 ## Primera publicación
 
@@ -8,7 +8,7 @@ La cuenta conectada es **Horizon-8**. El conector disponible permite trabajar co
 
 1. Abre `https://github.com/new` con tu cuenta.
 2. Crea un repositorio llamado **Amapola**, con visibilidad **Private**. Déjalo vacío, sin añadir README, licencia ni `.gitignore`, porque ya forman parte del proyecto.
-3. Facilita la URL del repositorio para enviar el código desde la conversación, o ejecuta en PowerShell, desde esta carpeta de trabajo del proyecto (donde está el historial preparado):
+3. Abre el repositorio que acabas de crear y copia la URL del navegador, por ejemplo `https://github.com/Horizon-8/Amapola`. También sirve **Code → HTTPS → copiar**, que termina en `.git`. Facilita esa URL para enviar el código desde la conversación, o ejecuta en PowerShell, desde esta carpeta de trabajo del proyecto (donde está el historial preparado):
 
 ```powershell
 .\windows\Publicar-GitHub.ps1 -RepositoryUrl 'https://github.com/Horizon-8/Amapola.git'
@@ -36,7 +36,7 @@ Un commit local conserva una versión en este PC; `git push` envía esa versión
 
 Puedes recuperar las fuentes con `git clone` desde tu repositorio privado. El motor Node.js y los ejecutables generados se obtienen o reconstruyen por separado, siguiendo README.md y windows/build.ps1. Para usar la aplicación en otro PC, el ZIP portátil sigue siendo la opción directa; después restaura tu copia de datos `.amapola` si quieres recuperarlos.
 
-También se entrega un respaldo del historial, `Amapola-0.5.0-source.bundle`. Contiene las fuentes y los commits, sin datos personales ni el motor Node.js. Puedes guardarlo fuera de este PC mientras se completa la publicación en GitHub. Para recuperar las fuentes desde ese archivo:
+En la conversación anterior se entregó un respaldo del historial hasta 0.5.0, `Amapola-0.5.0-source.bundle`. Contiene esas fuentes y commits, sin datos personales ni el motor Node.js. Puedes guardarlo fuera de este PC mientras se completa la publicación en GitHub. El ZIP actual incluye las fuentes actualizadas a 0.5.1, pero ese respaldo anterior corresponde a 0.5.0. Para recuperar las fuentes desde ese archivo:
 
 ```powershell
 git clone Amapola-0.5.0-source.bundle Amapola

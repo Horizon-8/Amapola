@@ -1,4 +1,10 @@
-# Pruebas de la versión 0.5.0 — estados y borrado individual
+# Pruebas de la versión 0.5.1 — iconos
+
+1. Extraer todo el ZIP 0.5.1, comprobar el icono de flor con A en Amapola.exe y ejecutar Crear-acceso-directo.vbs para actualizar el acceso directo del escritorio.
+2. Cancelar una clase en Semana: el nombre y la hora quedan tachados; la cruz de estado y el icono de pago siguen claros y sin línea encima. Probar también las clases de 15 y 30 minutos y el modo oscuro.
+3. Pulsar el estado y el pago: sus acciones se conservan, los botones se pueden activar con teclado y las etiquetas explican el estado actual y el siguiente.
+
+## Pruebas anteriores: estados y borrado individual (0.5.0)
 
 Abre **Amapola.exe del proyecto** y comprueba **v0.5.0** al pie. El ZIP 0.4.1 sigue siendo la distribución anterior.
 

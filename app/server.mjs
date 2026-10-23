@@ -11,7 +11,7 @@ import { Backups } from './backup.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.5.0';
+export const appVersion = '0.5.1';
 const buildHash = createHash('sha256');
 for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'public/class-utils.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');
