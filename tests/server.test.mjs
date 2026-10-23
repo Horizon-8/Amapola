@@ -1,0 +1,60 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
+import { startApp } from '../app/server.mjs';
+import { Backups } from '../app/backup.mjs';
+import { Store, defaults, todayIn } from '../app/domain.mjs';
+
+test('HTTP full data lifecycle, protections, backup and restoration',async t=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-api-'));
+  const app=await startApp({dataDir:dir,port:0});t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
+  const raw=await fetch(app.url);assert.equal(raw.status,200);const html=await raw.text();assert.match(html,/lang="es"/);
+  const cookie=raw.headers.get('set-cookie').split(';')[0];
+  const noAuth=await fetch(`${app.url}/api/bootstrap`);assert.equal(noAuth.status,401);
+  const initial=await (await fetch(`${app.url}/api/bootstrap`,{headers:{Cookie:cookie}})).json();assert.equal(initial.students.length,0);
+  const headers={'Cookie':cookie,'Origin':app.url,'Content-Type':'application/json','X-Amapola-Token':initial.csrf};
+  const denied=await fetch(`${app.url}/api/students`,{method:'POST',headers:{...headers,Origin:'https://evil.example'},body:'{}'});assert.equal(denied.status,403);
+  const post=async(route,method,data)=>fetch(`${app.url}${route}`,{method,headers,body:JSON.stringify(data)});
+  const student=await (await post('/api/students','POST',{firstName:'Lucía',lastName:'López',email:'lucia@example.test',color:'#8b79bd',active:true})).json();assert.ok(student.id);
+  const plan=await (await post('/api/schedules','POST',{studentId:student.id,title:'Inglés',time:'10:00',duration:60,price:5000000,weekday:1,startDate:todayIn(defaults.timezone),endDate:'',recurrence:'weekly',modality:'travel',active:true})).json();assert.ok(plan.id);
+  const history=await fetch(`${app.url}/api/students/${student.id}/history`,{headers});assert.equal(history.status,200);
+  const copy=await (await post('/api/backups/local','POST',{})).json();
+  const bytes=Buffer.from(await (await fetch(`${app.url}/api/backups/file/${copy.filename}`,{headers})).arrayBuffer());
+  const archive=JSON.parse(gunzipSync(bytes));assert.equal(archive.students[0].id,student.id);assert.equal(archive.schedules[0].modality,'travel');assert.equal(archive.settings.currency,'COP');
+  const blocked=await post(`/api/students/${student.id}`,'DELETE',{});assert.equal(blocked.status,400);
+  const deletion=await post(`/api/students/${student.id}`,'DELETE',{confirm:true});assert.equal(deletion.status,200);assert.equal(app.store.all('students').length,0);
+  let restored=await fetch(`${app.url}/api/restore`,{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},body:bytes});assert.equal(restored.status,400);
+  const preview=await fetch(`${app.url}/api/restore/preview`,{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},body:bytes});assert.equal((await preview.json()).students,1);
+  restored=await fetch(`${app.url}/api/restore`,{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},body:bytes});assert.equal(restored.status,200);assert.equal(app.store.all('students').length,1);
+  assert.ok((await app.backups.list()).some(f=>f.filename.includes('antes-de-restaurar')));
+  const same=await startApp({dataDir:dir,port:0});assert.equal(same.reused,true);assert.equal(same.url,app.url);
+});
+test('database survives closing and reopening without demo data',async()=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-persist-'));
+  let app=await startApp({dataDir:dir,port:0});const row=app.store.saveStudent({firstName:'Mateo',color:'#bc587a'});await app.close();
+  app=await startApp({dataDir:dir,port:0});assert.equal(app.store.all('students').length,1);assert.equal(app.store.get('students',row.id).firstName,'Mateo');await app.close();await rm(dir,{recursive:true,force:true});
+});
+test('kDrive API folder creation and upload require exact name/size confirmation',async t=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-kdrive-')),store=new Store(':memory:');
+  t.after(async()=>{store.close();await rm(dir,{recursive:true,force:true});});
+  store.saveSettings({...defaults,backupMode:'api',driveId:'12345',driveFolder:'Amapola/Copias'});
+  const requests=[];let parent=20,fail=false;
+  const mock=async(url,options)=>{
+    requests.push({url,options});
+    const json=data=>new Response(JSON.stringify({result:'success',data}),{headers:{'Content-Type':'application/json'}});
+    if(url.includes('/1/files?'))return json([{id:10,visibility:'is_private_space',capabilities:{can_create_directory:true,can_upload:true}}]);
+    if(url.includes('/name?'))return new Response('',{status:404});
+    if(url.endsWith('/directory'))return json({id:parent++,type:'dir'});
+    const parsed=new URL(url);return json({id:99,name:parsed.searchParams.get('file_name'),size:Number(parsed.searchParams.get('total_size'))+(fail?1:0)});
+  };
+  const backups=new Backups(store,dir,mock);
+  const result=await backups.send('test-token-only');assert.equal(result.remoteConfirmed,true);
+  assert.ok(requests.every(r=>r.url.startsWith('https://api.infomaniak.com/3/drive/12345/')));
+  assert.ok(requests.every(r=>r.options.headers.Authorization==='Bearer test-token-only'));
+  fail=true;await assert.rejects(backups.send('test-token-only'),/no confirmó/);
+  await assert.rejects(backups.send(''),/token API/);
+  assert.equal(store.settings().token,undefined);
+});

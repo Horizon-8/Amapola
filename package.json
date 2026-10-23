@@ -1,0 +1,9 @@
+{
+  "name": "amapola",
+  "version": "0.4.1",
+  "private": true,
+  "description": "Gestión local de alumnos y clases",
+  "type": "module",
+  "engines": { "node": ">=24.13.0 <25" },
+  "scripts": { "start": "node app/server.mjs --open", "test": "node --test", "check": "node --check app/server.mjs && node --check app/domain.mjs && node --check app/backup.mjs && node --check app/public/app.js && node --check app/public/calendar-interactions.mjs && node --check app/public/class-utils.mjs" }
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Amapola · Mis clases</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Ir al contenido</a>
+  <aside class="sidebar" aria-label="Navegación principal">
+    <a class="brand" href="#calendario"><span class="brand-flower" aria-hidden="true">✿</span><span>Amapola<small>ESPACIO PARA ENSEÑAR</small></span></a>
+    <div class="workspace-label">MI ESPACIO</div>
+    <nav id="navigation"></nav>
+    <div class="sidebar-note"><span aria-hidden="true">✧</span><p>Un lugar para tus clases.<br>Más espacio para ti.</p></div>
+    <div class="sidebar-bottom"><a href="#ajustes" id="settings-link"></a><button id="shutdown" class="nav-item"></button><div class="local-status"><span class="status-dot"></span> En este ordenador · Sin conexión requerida</div></div>
+  </aside>
+  <div class="shell">
+    <header class="topbar"><div class="breadcrumb"><span id="business-name">Mis clases</span><span class="separator">/</span><span id="page-name">Calendario</span></div><div class="top-actions"><span class="local-badge"><span class="status-dot"></span> Guardado en tu PC</span><button id="theme-toggle" class="icon-button" title="Cambiar apariencia" aria-label="Cambiar apariencia"></button><a class="profile-avatar" href="#ajustes" id="profile-avatar" aria-label="Mi información">A</a></div></header>
+    <main id="main" tabindex="-1"><div class="loading"><span class="brand-flower">✿</span><p>Preparando tu espacio…</p></div></main>
+    <footer class="app-footer"><span>Amapola <span class="muted">· v0.4.1</span></span><span>Hecho para tus días de enseñanza <span class="rose">✿</span></span></footer>
+  </div>
+  <dialog id="dialog"><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
