@@ -57,6 +57,8 @@
 @media(max-width:650px){.class-filters{padding:16px;grid-template-columns:1fr}.payment-legend{gap:10px;padding:12px}.agenda-item>.payment-pill{font-size:10px;min-height:25px;padding:4px 6px}.agenda-item>.payment-pill>span+span{display:none}.agenda-item>.payment-pill{width:25px}.payment-totals .stat-value{font-size:25px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 /* One continuous grid keeps all seven columns on identical quarter hours. */
+.calendar-now-indicator{position:absolute;left:0;right:0;height:3px;background:var(--rose-dark);border-radius:2px;transform:translateY(-50%);z-index:100;pointer-events:none}
+.calendar-now-indicator::before{content:'';position:absolute;left:0;top:50%;width:11px;height:11px;border-radius:50%;background:inherit;transform:translate(-50%,-50%)}
 .calendar-body{isolation:isolate}
 .calendar-body .day-lane{background-image:none}
 .calendar-grid-lines{position:absolute;top:0;bottom:0;left:52px;right:0;z-index:1;pointer-events:none}

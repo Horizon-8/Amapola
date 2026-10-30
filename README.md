@@ -1,5 +1,11 @@
 # Amapola
 
+## Versión 0.5.2 — hora actual en el calendario, lista para probar
+
+Abre **Amapola.exe del proyecto** y comprueba **v0.5.2** al pie. La semana muestra una línea rosa con un punto en el día actual. Su posición se actualiza cada 30 segundos y al volver a la ventana, sin recargar ni interrumpir la edición de una clase. Sigue la zona horaria de Mi información, también sin Internet. Al abrir la semana actual por primera vez, el calendario se sitúa cerca de la hora actual; al editar, conserva tu desplazamiento.
+
+Al cambiar de día, la marca y el resaltado de hoy cambian de columna. Si hoy queda fuera de la semana visible, la marca no se muestra. La sincronización con Google Calendar todavía no está implementada. No se ha generado un ZIP 0.5.2; el último ZIP portable sigue siendo 0.5.1.
+
 ## Versión 0.5.1 — icono de Windows e indicadores legibles
 
 El ejecutable incorpora la flor con una A. El icono de Windows incluye tamaños de 16 a 256 píxeles. Para crear o actualizar el acceso directo del escritorio, ejecuta **Crear-acceso-directo.vbs** después de extraer toda la aplicación; utiliza el icono `windows/Amapola.ico`.

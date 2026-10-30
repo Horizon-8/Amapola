@@ -1,4 +1,11 @@
-# Pruebas de la versión 0.5.1 — iconos
+# Pruebas de la versión 0.5.2 — hora actual
+
+1. Abre Amapola.exe del proyecto y comprueba v0.5.2 al pie. En Calendario → Semana → Hoy, debe aparecer una línea rosa oscura con un punto en la columna de hoy, a la altura de la hora actual según la zona horaria de Mi información.
+2. Deja la vista abierta un minuto: la marca debe avanzar sin recargar la página. Cambia de ventana y vuelve; comprueba que la hora se actualiza al instante y que el desplazamiento no salta mientras consultas o editas una clase.
+3. Navega a una semana pasada o futura: no debe haber línea de ahora. Vuelve a Hoy. Prueba los temas claro y oscuro, una ventana estrecha y una clase justo debajo de la línea: mover, redimensionar, estado y pago deben seguir funcionando.
+4. Cambia la zona horaria en Mi información (por ejemplo Bogotá y París) y vuelve al calendario: día y hora deben corresponder a ese ajuste. La marca funciona sin Internet mientras Amapola.exe siga abierto.
+
+## Pruebas anteriores: iconos (0.5.1)
 
 1. Extraer todo el ZIP 0.5.1, comprobar el icono de flor con A en Amapola.exe y ejecutar Crear-acceso-directo.vbs para actualizar el acceso directo del escritorio.
 2. Cancelar una clase en Semana: el nombre y la hora quedan tachados; la cruz de estado y el icono de pago siguen claros y sin línea encima. Probar también las clases de 15 y 30 minutos y el modo oscuro.

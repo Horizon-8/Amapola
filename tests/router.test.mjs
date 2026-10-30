@@ -23,6 +23,21 @@ function transport(app) {
     return {code,headers:output,bytes:body,json:()=>JSON.parse(body.toString()),text:()=>body.toString()};
   };
 }
+test('HTTP startup serves every imported frontend module with JavaScript MIME and matching app version',async t=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-startup-assets-')),app=await startApp({dataDir:dir,port:0});
+  t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
+  const request=transport(app),source=(await request('/app.js')).text();
+  const health=(await request('/api/health')).json();
+  assert.ok(source.includes(`health.version !== '${health.version}'`));
+  const imports=[...source.matchAll(/await import\('\.([^']+)'\)/g)].map(match=>match[1]);
+  assert.ok(imports.length>0);
+  for(const route of imports){
+    const response=await request(route);
+    assert.equal(response.code,200,route);
+    assert.match(response.headers['content-type'],/^text\/javascript/,route);
+    assert.ok(response.bytes.length>0,route);
+  }
+});
 test('HTTP status and single-session deletion preserve payment, require confirmation and create a restorable safety copy',async t=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-session-actions-')),app=await startApp({dataDir:dir,port:0});
   t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});

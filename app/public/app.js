@@ -1,9 +1,10 @@
-let attachCalendarGestures, paymentState, hasEnded;
+let attachCalendarGestures, attachCalendarClock, paymentState, hasEnded;
 try {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(10000) });
   const health = await response.json();
-  if (!response.ok || health.app !== 'amapola' || health.version !== '0.5.1') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
+  if (!response.ok || health.app !== 'amapola' || health.version !== '0.5.2') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
   ({ attachCalendarGestures } = await import('./calendar-interactions.mjs'));
+  ({ attachCalendarClock } = await import('./calendar-clock.mjs'));
   ({ paymentState, hasEnded } = await import('./class-utils.mjs'));
 } catch (error) {
   const target = document.getElementById('main');
@@ -205,7 +206,7 @@ function layoutEvents(events) {
 }
 function calendarGrid(rows) {
   const scale=calendarScale,height=1440*scale;
-  const headers=Array.from({length:7},(_,i)=>{const d=plusDays(S.week,i);return `<div class="calendar-day ${d===S.today?'today':''}"><span>${shortDays[i]}</span><strong class="day-number">${Number(d.slice(-2))}</strong></div>`;}).join('');
+  const headers=Array.from({length:7},(_,i)=>{const d=plusDays(S.week,i);return `<div class="calendar-day ${d===S.today?'today':''}" data-date="${d}"><span>${shortDays[i]}</span><strong class="day-number">${Number(d.slice(-2))}</strong></div>`;}).join('');
   const labels=Array.from({length:24},(_,i)=>`<span class="hour-label" style="top:${i*60*scale}px">${String(i).padStart(2,'0')}:00</span>`).join('');
   const lines=Array.from({length:96},(_,i)=>`<span class="calendar-grid-line ${i%4===0?'hour':i%2===0?'half':'quarter'}" style="top:${i*15*scale}px"></span>`).join('');
   const lanes=Array.from({length:7},(_,i)=>{
@@ -287,8 +288,13 @@ async function render() {
     if($('#backupMode'))$('#backupMode').addEventListener('change',ev=>{$$('.backup-api').forEach(e=>e.classList.toggle('hide',ev.target.value!=='api'));$$('.backup-folder').forEach(e=>e.classList.toggle('hide',ev.target.value!=='folder'));});
     if($('#restore-file'))$('#restore-file').addEventListener('change',ev=>{const file=ev.target.files[0];if(file)previewRestore(file);});
     if($('.calendar-scroll')){
-      $('.calendar-scroll').scrollTop=oldScroll??7.5*60*calendarScale;
-      disposeCalendar=attachCalendarGestures($('.calendar-body'),{rows:[...S.rows,...S.busyBlocks],onCreate:seed=>calendarCreateModal(seed),onChange:(row,change)=>row.kind==='busy'?busyModal(row.id,change):chooseScope(row,{...row,...change})});
+      const body=$('.calendar-body'),scroll=$('.calendar-scroll');
+      const disposeGestures=attachCalendarGestures(body,{rows:[...S.rows,...S.busyBlocks],onCreate:seed=>calendarCreateModal(seed),onChange:(row,change)=>row.kind==='busy'?busyModal(row.id,change):chooseScope(row,{...row,...change})});
+      disposeCalendar=disposeGestures;
+      const disposeClock=attachCalendarClock(body,{timeZone:S.settings.timezone,onDayChange:today=>{S.today=today;}});
+      disposeCalendar=()=>{disposeGestures();disposeClock();};
+      const clock=classClock(),hasToday=!!$(`.day-lane[data-date="${clock.today}"]`,body);
+      scroll.scrollTop=oldScroll??(hasToday?Math.max(0,min(clock.time)*calendarScale-scroll.clientHeight/3):7.5*60*calendarScale);
     }
   } catch(e){if(ticket===S.renderId){disposeCalendar();$('#main').innerHTML=empty('No se pudo abrir esta vista',esc(e.message),page==='clases'?'<button class="btn" data-action="class-clear">Restablecer filtros</button>':'<button class="btn" data-action="retry">Reintentar</button>');toast(e.message,true);}}
 }
@@ -489,7 +495,7 @@ document.addEventListener('click',async ev=>{
 });
 document.addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.agenda-item,.calendar-event')){ev.preventDefault();ev.target.click();}});
 $('#theme-toggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
-$('#shutdown').addEventListener('click',()=>confirmAction('¿Cerrar Amapola?','Se guardará una última copia local y el programa se cerrará. Para volver, abre el acceso directo de Amapola.','Cerrar aplicación',async()=>{await api('/api/shutdown','POST',{});$('#main').innerHTML=empty('Hasta tu próxima clase','Amapola está cerrada. Puedes cerrar esta pestaña.');toast('Aplicación cerrada.');}));
+$('#shutdown').addEventListener('click',()=>confirmAction('¿Cerrar Amapola?','Se guardará una última copia local y el programa se cerrará. Para volver, abre el acceso directo de Amapola.','Cerrar aplicación',async()=>{await api('/api/shutdown','POST',{});disposeCalendar();$('#main').innerHTML=empty('Hasta tu próxima clase','Amapola está cerrada. Puedes cerrar esta pestaña.');toast('Aplicación cerrada.');}));
 window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#alumnos/'))S.studentTab='planning';render();});
 window.addEventListener('focus',async()=>{if(S.csrf){try{const old=S.today;await refresh();if(old!==S.today)await render();}catch{}}});
 applyTheme(theme);

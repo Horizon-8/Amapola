@@ -11,9 +11,9 @@ import { Backups } from './backup.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.5.1';
+export const appVersion = '0.5.2';
 const buildHash = createHash('sha256');
-for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'public/class-utils.mjs']) buildHash.update(readFileSync(path.join(root, file)));
+for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'public/class-utils.mjs', 'public/calendar-clock.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');
 export function openBrowser(url) {
   const child = process.platform === 'win32'
@@ -109,6 +109,7 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
         const files = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
         files['/class-utils.mjs'] = ['class-utils.mjs', 'text/javascript; charset=utf-8'];
         files['/calendar-interactions.mjs'] = ['calendar-interactions.mjs', 'text/javascript; charset=utf-8'];
+        files['/calendar-clock.mjs'] = ['calendar-clock.mjs', 'text/javascript; charset=utf-8'];
         const asset = files[route]; if (!asset) throw new AppError('Página no encontrada.', 404);
         if (route === '/') res.setHeader('Set-Cookie', `${cookieName}=${secret}; Path=/; HttpOnly; SameSite=Strict`);
         const bytes = readFileSync(path.join(publicDir, asset[0]));
