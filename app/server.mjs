@@ -12,7 +12,7 @@ import { GoogleSync } from './google-sync.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.7.0';
+export const appVersion = '0.7.1';
 const buildHash = createHash('sha256');
 for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'google-data.mjs', 'google-sync.mjs', 'public/class-utils.mjs', 'public/calendar-clock.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');

@@ -1,5 +1,10 @@
 # Amapola
 
+## Versión 0.7.1 - apertura del calendario sin conexión Google
+
+Corrige un error de interfaz en los filtros de agendas que impedía abrir las vistas, con o sin cuenta Google configurada. Añade una prueba de apertura y navegación por Calendario, Alumnos y Planificación. Abre Amapola.exe y comprueba v0.7.1.
+
+
 ## Versión 0.7.0 — Google manual, agendas visibles y clases cada dos semanas
 
 Abre **Amapola.exe del proyecto** y comprueba **v0.7.0** al pie. Al abrir, una ventana propone **recibir** Google. Después los intercambios son manuales: **Actualizar desde Google ↓** aplica Google a las clases vinculadas y a los bloques Busy; **Enviar a Google ↑** aplica directamente las clases Amapola al agenda Amapola, sin recuperar cambios del teléfono. No hay intercambios automáticos después de editar ni cada dos minutos.

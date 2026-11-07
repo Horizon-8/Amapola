@@ -51,3 +51,28 @@ test('display filters hide events without changing the complete set of data used
   `,context);
   assert.doesNotMatch(context.html,/data-id="local-class"|data-id="busy-personal"/);assert.match(context.html,/data-id="busy-work"/);assert.match(context.html,/Privado &lt;chat&gt;/);assert.equal(context.keptRows,1);assert.equal(context.keptBlocks,2);
 });
+
+test('complete calendar rendering and navigation work with or without a Google connection',async t=>{
+  for(const connected of [false,true])await t.test(connected?'Google connected':'Google not configured',async()=>{
+    const {context,nodes}=ui(),visibility=[{dataset:{calendarVisibility:'$amapola'}},{dataset:{calendarVisibility:'$local-busy'}}];
+    const listeners=[];visibility.forEach(input=>input.addEventListener=(type,listener)=>listeners.push({input,type,listener}));
+    for(const key of ['#main','#page-name','#google-sync-control','.calendar-scroll','.calendar-body'])context.document.querySelector(key);
+    nodes['.calendar-scroll'].clientHeight=600;
+    nodes['.calendar-body'].querySelector=()=>null;
+    context.document.querySelector=selector=>selector==='[data-calendar-visibility]'?(context.location.hash==='#calendario'?visibility[0]:null):selector.startsWith('.calendar-')&&context.location.hash!=='#calendario'?null:nodes[selector]||null;
+    context.document.querySelectorAll=selector=>selector==='[data-calendar-visibility]'&&context.location.hash==='#calendario'?visibility:[];
+    context.attachCalendarGestures=()=>{context.gestures=(context.gestures||0)+1;return ()=>{};};
+    context.attachCalendarClock=()=>()=>{};
+    vm.runInContext(`
+      Object.assign(S,{today:'2026-10-30',week:'2026-10-26',google:{configured:${connected},connected:${connected},state:'${connected?'pending':'disconnected'}',sourceIds:null,calendars:[],hiddenCalendarIds:[]}});
+      globalThis.errors=[];toast=(message,error)=>{if(error)errors.push(message);};
+      api=async route=>route.startsWith('/api/reports')?{current:{count:0,hours:0,total:0}}:[];
+      globalThis.openView=async page=>{location.hash='#'+page;await render();};
+    `,context);
+    for(const page of ['calendario','alumnos','planificacion','calendario']){
+      await context.openView(page);assert.doesNotMatch(nodes['#main'].innerHTML,/No se pudo abrir esta vista/);
+    }
+    assert.equal(context.errors.length,0);assert.equal(context.gestures,2);assert.equal(listeners.length,4);
+    assert.match(nodes['#main'].innerHTML,/Agendas visibles/);
+  });
+});

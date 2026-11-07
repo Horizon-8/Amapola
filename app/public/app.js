@@ -2,7 +2,7 @@ let attachCalendarGestures, attachCalendarClock, paymentState, hasEnded;
 try {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(10000) });
   const health = await response.json();
-  if (!response.ok || health.app !== 'amapola' || health.version !== '0.7.0') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
+  if (!response.ok || health.app !== 'amapola' || health.version !== '0.7.1') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
   ({ attachCalendarGestures } = await import('./calendar-interactions.mjs'));
   ({ attachCalendarClock } = await import('./calendar-clock.mjs'));
   ({ paymentState, hasEnded } = await import('./class-utils.mjs'));
@@ -393,7 +393,7 @@ async function render() {
     if(page==='informes'){const report=await api(`/api/reports?week=${S.week}`);if(ticket!==S.renderId)return;html=renderReports(report);}
     if(page==='ajustes'){const backups=await api('/api/backups');if(ticket!==S.renderId)return;html=renderSettings(backups);}
     disposeCalendar();$('#main').innerHTML=html;fillStudentTable();S.googleRenderedRevision=S.google?.revision;S.currentPage=page;googleSyncStatus();if(enteringCalendar&&S.startupHandled)void checkCalendarEntry();
-    $('[data-calendar-visibility]').forEach(input=>input.addEventListener('change',async()=>{const hidden=new Set(S.google?.hiddenCalendarIds||[]);if(input.checked)hidden.delete(input.dataset.calendarVisibility);else hidden.add(input.dataset.calendarVisibility);try{S.google=await api('/api/google/visibility','PUT',{hiddenIds:[...hidden]});await render();}catch(error){input.checked=!input.checked;toast(error.message,true);}}));
+    $$('[data-calendar-visibility]').forEach(input=>input.addEventListener('change',async()=>{const hidden=new Set(S.google?.hiddenCalendarIds||[]);if(input.checked)hidden.delete(input.dataset.calendarVisibility);else hidden.add(input.dataset.calendarVisibility);try{S.google=await api('/api/google/visibility','PUT',{hiddenIds:[...hidden]});await render();}catch(error){input.checked=!input.checked;toast(error.message,true);}}));
     if(page==='ajustes')$('#main').insertAdjacentHTML('beforeend',googleSettings());
     if($('#google-client'))$('#google-client').addEventListener('change',async ev=>{const file=ev.target.files[0];if(!file)return;try{if(file.size>100000)throw Error('Archivo de conexión demasiado grande.');const client=JSON.parse(await file.text());await api('/api/google/client','POST',client);await refresh();await render();toast('Conexión preparada. Pulsa Conectar Google.');}catch(error){toast(error.message,true);}});
     if($('#google-calendars-form'))$('#google-calendars-form').addEventListener('submit',async ev=>{ev.preventDefault();try{const ids=[...new FormData(ev.target).getAll('calendar')];await api('/api/google/calendars','PUT',{ids});await refresh();await render();toast('Selección guardada. Pulsa Actualizar para recibir los agendas.');}catch(error){toast(error.message,true);}});
