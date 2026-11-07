@@ -1,5 +1,10 @@
 // Only calendar data belongs in the database and backups. OAuth credentials live separately.
 export const googleId = value => typeof value === 'string' && value.length > 0 && value.length <= 1024;
+export function googleWindow(zone, now = new Date()) {
+  const from=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const day=new Date(from+'T12:00:00Z');day.setUTCDate(day.getUTCDate()+29);const to=day.toISOString().slice(0,10);
+  day.setUTCDate(day.getUTCDate()+1);return {from,to,end:day.toISOString().slice(0,10)};
+}
 export function syncRows(rows = []) {
   if (!Array.isArray(rows) || rows.length > 100000) throw Error('Datos de Google no válidos.');
   return rows.map(row => {
@@ -7,7 +12,7 @@ export function syncRows(rows = []) {
     const value = JSON.parse(row.json);
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Datos de Google no válidos.');
     const fields = row.id === 'config'
-      ? ['namespace','account','calendarId','clientId','sourceIds','paused','lastSync']
+      ? ['namespace','account','calendarId','clientId','sourceIds','paused','lastSync','lastPull','lastPush']
       : row.id.startsWith('link-')
         ? ['key','sessionId','googleId','etag','baseHash','infoHash','gone','review','conflict','remote']
         : ['calendarId','calendarName','event','pending','dismissed','linkKey'];
@@ -45,6 +50,8 @@ export function eventSegments(event, zone, from, to) {
 }
 export function googleBusy(rows, zone, from, to) {
   const output=[];
+  const window=googleWindow(zone);from=from<window.from?window.from:from;to=to>window.to?window.to:to;
+  if(from>to)return output;
   const config=rows.find(r=>r.id==='config'),selected=config?JSON.parse(config.json):null;
   for(const row of rows){
     if(!row.id.startsWith('event-'))continue;

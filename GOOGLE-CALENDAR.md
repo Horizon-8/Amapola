@@ -1,4 +1,4 @@
-# Google Calendar dans Amapola 0.6.0
+# Google Calendar dans Amapola 0.6.1
 
 ## Première connexion
 
@@ -15,8 +15,9 @@ Les permissions demandées permettent de lire les agendas accessibles et leurs �
 
 ## Règles
 
-- Au lancement, après une modification locale et toutes les deux minutes lorsque le programme est ouvert : **Google → Amapola**, puis **Amapola → Google**. Le bouton **Sincronizar** permet de demander un passage immédiatement.
-- La fenêtre synchronisée couvre les 90 jours précédents et un an à venir. Un événement déjà lié qui sort de cette fenêtre est vérifié individuellement ; sortir de la fenêtre ne signifie pas qu'il a été supprimé. Les séries Amapola sont envoyées sous forme de sessions individuelles sur cette période.
+- Au lancement, après une modification locale et toutes les deux minutes lorsque le programme est ouvert : **Google → Amapola**, puis **Amapola → Google**. Le bouton général **Sincronizar** permet de demander les deux étapes immédiatement.
+- Sur la page Calendrier, **Recibir de Google** importe uniquement : aucun événement n'est envoyé, modifié ou supprimé dans Google par ce passage. **Enviar a Google** vérifie d'abord les changements Google, puis envoie les changements locaux. La synchronisation automatique habituelle reste active.
+- La fenêtre synchronisée couvre **30 jours glissants**, d'aujourd'hui au jour 29 inclus, selon le fuseau horaire configuré. Aucun historique antérieur ni année entière n'est transféré. Un événement déjà lié qui est déplacé hors de cette fenêtre est aligné une fois, puis reste conservé sans être consulté à chaque passage tant qu'il reste hors période. Sortir de la fenêtre ne signifie jamais qu'il a été supprimé. Les séries Amapola sont envoyées sous forme de sessions individuelles sur ce mois.
 - Les autres événements Google sont des blocs **Busy**, gris rayés, avec leur titre d'origine. Les événements sur plusieurs jours et les journées entières occupent les jours correspondants. Un bloc Google se modifie dans Google.
 - Une description commençant par **Amapola** crée une entrée **Por completar** : sélectionner l'élève, le tarif, la modalité et vérifier l'horaire. Cette entrée ne génère aucun revenu avant son association. La classe créée est ponctuelle, sans nouvelle planification récurrente.
 - Pour éviter une copie dans deux agendas Google, crée les cours directement dans l'agenda **Amapola**. Si tu marques un événement d'un autre agenda, Amapola conserve l'original et t'avertit avant de créer son événement lié dans l'agenda Amapola. Les modifications ultérieures de l'original sont aussi récupérées ; un changement direct dans l'agenda Amapola est prioritaire si les deux ont changé au même passage.
@@ -28,7 +29,7 @@ Les permissions demandées permettent de lire les agendas accessibles et leurs �
 
 ## Statut et fonctionnement hors connexion
 
-Le haut de l'application affiche l'état Google : déconnecté, en cours, changements à envoyer, synchronisé, hors connexion ou à vérifier. Les erreurs réseau affichent aussi une notification. Les données sont d'abord enregistrées sur le PC. Si Google est indisponible, les modifications sont reprises lors d'un prochain passage réussi ; un état hors connexion ne signifie pas « synchronisé ».
+Le haut de l'application affiche l'état Google : déconnecté, en cours, changements à envoyer, données reçues, synchronisé, hors connexion ou à vérifier. Les paramètres distinguent la dernière réception, le dernier envoi et la dernière synchronisation complète. Une réception seule n'est pas annoncée comme un envoi terminé. Les erreurs réseau affichent aussi une notification. Les données sont d'abord enregistrées sur le PC. Si Google est indisponible, les modifications sont reprises lors d'un prochain passage réussi ; un état hors connexion ne signifie pas « synchronisé ».
 
 Amapola.exe doit être ouvert pour synchroniser. Quand le PC est éteint, les événements déjà envoyés restent accessibles sur le téléphone. Les modifications du téléphone seront récupérées au prochain lancement d'Amapola.
 

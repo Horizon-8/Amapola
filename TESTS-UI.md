@@ -1,4 +1,11 @@
-# Pruebas de la versión 0.6.0 — Google Calendar
+# Pruebas de la versión 0.6.1 — mes y controles de sincronización
+
+1. Abre Amapola.exe del proyecto y comprueba v0.6.1. En Calendario deben aparecer **Recibir de Google** y **Enviar a Google**, con el periodo Próximos 30 días. Se habilitan cuando Google está conectado y no hay otra sincronización en curso.
+2. Crea una cita en Google y una clase local pendiente. Pulsa Recibir de Google: la cita debe bajar, sin enviar la clase local. El estado indica datos recibidos o cambios locales pendientes; la fecha del último envío no cambia.
+3. Pulsa Enviar a Google: debe comprobar primero los cambios del teléfono y después enviar las clases locales. En Mi información se muestran última recepción, último envío y última sincronización completa.
+4. Comprueba eventos de hoy, del día 29 y del día 30 a partir de hoy: los dos primeros están en el periodo, el último todavía no. No se envía todo el año ni se importa el historial anterior. Las clases y los eventos ya existentes fuera del mes se conservan.
+
+## Pruebas anteriores: Google Calendar (0.6.0)
 
 La primera conexión se describe en GOOGLE-CALENDAR.md. Abre Amapola.exe del proyecto y comprueba v0.6.0. Usa datos y agendas de prueba para el primer ensayo.
 

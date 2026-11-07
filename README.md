@@ -1,5 +1,11 @@
 # Amapola
 
+## Versión 0.6.1 — sincronización a 30 días y controles del calendario
+
+Abre **Amapola.exe del proyecto** y comprueba **v0.6.1** al pie. Google sincroniza los próximos **30 días**, incluyendo hoy, según la zona horaria del espacio. La página Calendario incluye **Recibir de Google** (solo importar) y **Enviar a Google** (comprobar Google y después enviar). El botón general **Sincronizar** y la sincronización automática conservan ambos pasos. La configuración muestra por separado la última recepción y el último envío.
+
+Los eventos ya vinculados se conservan al salir del periodo; no se eliminan por quedar fuera de la ventana. Un cambio que mueve una clase vinculada fuera del mes se alinea una vez antes de dejar de consultarla. Los bloques Busy de Google se muestran dentro del mes sincronizado. No se ha generado un ZIP nuevo; esta versión está lista para pruebas locales.
+
 ## Versión 0.6.0 — Google Calendar, lista para configurar y probar
 
 Abre **Amapola.exe del proyecto** y comprueba **v0.6.0** al pie. **Mi información → Sincronización con Google Calendar** permite importar la conexión Google, autorizar la cuenta y seleccionar los agendas leídos. Todos están seleccionados por defecto; Amapola escribe únicamente en el agenda Amapola creado por la aplicación. Consulta **GOOGLE-CALENDAR.md** para la primera conexión y las reglas completas.

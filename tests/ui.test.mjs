@@ -143,12 +143,14 @@ test('Google settings select calendars and imported busy or pending lessons rend
     S.googleCalendars=[{id:'target',title:'Amapola'},{id:'personal',title:'Personal <privado>',primary:true}];
     globalThis.settings=googleSettings();globalThis.inbox=googleInboxPanel();
     const busy={id:'google1',googleRecord:'event-test',kind:'busy',source:'google',readOnly:true,needsAssignment:true,date:S.today,time:'10:15',duration:45,title:'Clase <nueva>',calendarName:'Personal',notes:''};
-    globalThis.week=calendarGrid([busy]);globalThis.agendaHTML=agenda([busy]);
+    globalThis.week=calendarGrid([busy]);globalThis.agendaHTML=agenda([busy]);globalThis.calendarPage=renderCalendar([],{current:{count:0,hours:0,total:0}},[busy]);
   `,context);
   assert.match(context.settings,/name="calendar" value="target" checked disabled/);assert.match(context.settings,/name="calendar" value="personal" checked/);
   assert.match(context.settings,/Personal &lt;privado&gt;/);assert.match(context.inbox,/Completar clase/);assert.doesNotMatch(context.inbox,/<nueva>/);
   assert.match(context.week,/google-busy google-pending/);assert.match(context.week,/data-action="google-event" data-read-only="true"/);assert.doesNotMatch(context.week,/data-resize=/);
   assert.match(context.agendaHTML,/Google · Completar clase/);assert.match(context.agendaHTML,/data-action="google-event"/);
+  assert.match(context.calendarPage,/data-action="google-pull" data-google-direction="pull"/);assert.match(context.calendarPage,/Recibir de Google/);
+  assert.match(context.calendarPage,/data-action="google-push" data-google-direction="push"/);assert.match(context.calendarPage,/Enviar a Google/);assert.match(context.calendarPage,/Próximos 30 días/);
 });
 
 function fakeTarget() {

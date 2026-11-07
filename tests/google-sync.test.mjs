@@ -5,6 +5,7 @@ import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { Store, defaults, todayIn, addDays, weekday } from '../app/domain.mjs';
 import { GoogleSync } from '../app/google-sync.mjs';
+import { googleWindow } from '../app/google-data.mjs';
 
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json'}});
 const copy=value=>structuredClone(value);
@@ -15,7 +16,7 @@ function remote(){
   api.set=(calendar,event)=>{const value={...copy(event),etag:'"'+(++sequence)+'"'};events.get(calendar).set(value.id,value);return value;};
   api.fetch=async(url,options={})=>{
     const parsed=new URL(url),route=decodeURIComponent(parsed.pathname.replace('/calendar/v3','')),method=options.method||'GET',body=options.body&&options.headers?.['Content-Type']==='application/json'?JSON.parse(options.body):null;
-    api.requests.push({route,method,body,etag:options.headers?.['If-Match']});
+    api.requests.push({route,method,body,etag:options.headers?.['If-Match'],query:Object.fromEntries(parsed.searchParams)});
     if(api.fail?.(route,method))throw Error('network unavailable');
     if(parsed.hostname==='oauth2.googleapis.com')return json({access_token:'access-for-tests',refresh_token:'refresh-for-tests',expires_in:3600});
     if(route==='/users/me/calendarList')return json({items:copy(calendars)});
@@ -24,7 +25,7 @@ function remote(){
     if(method!=='GET')assert.equal(calendar,'target','Only the Amapola agenda may be changed');
     if(!id&&method==='GET'){
       const min=parsed.searchParams.get('timeMin'),max=parsed.searchParams.get('timeMax');
-      return json({items:[...list.values()].filter(e=>!e.start?.dateTime||(!min||e.start.dateTime>=min)&&(!max||e.start.dateTime<max)).map(copy)});
+      return json({items:[...list.values()].filter(e=>{const start=e.start?.dateTime||(e.start?.date?e.start.date+'T00:00:00.000Z':null),end=e.end?.dateTime||(e.end?.date?e.end.date+'T00:00:00.000Z':null);return !start||(!min||end>min)&&(!max||start<max);}).map(copy)});
     }
     if(!id&&method==='POST'){
       if(list.has(body.id))return json({},409);
@@ -53,6 +54,36 @@ async function fixture(t){
   return {dir,store,api,sync,date,student,addClass};
 }
 const event=(id,date,extra={})=>({id,summary:'Evento Google',status:'confirmed',start:{dateTime:date+'T10:00:00.000Z'},end:{dateTime:date+'T11:00:00.000Z'},...extra});
+
+test('the rolling month includes today and day 29, excludes history and day 30, and follows the workspace timezone',async t=>{
+  const {store,api,sync,student}=await fixture(t),today=todayIn('UTC');
+  for(const offset of [-1,0,29,30]){
+    const date=addDays(today,offset);store.saveSchedule({studentId:student.id,title:'Clase '+offset,startDate:date,weekday:weekday(date),time:'10:00',duration:60,price:0,recurrence:'once'});
+    api.set('personal',event('event-'+offset,date));
+  }
+  await sync.run();assert.equal(api.events.get('target').size,2);
+  assert.deepEqual(store.busyBlocks(addDays(today,-1),addDays(today,30)).map(r=>r.date),[today,addDays(today,29)]);
+  const query=api.requests.find(r=>r.route==='/calendars/target/events'&&r.method==='GET').query;
+  assert.equal(query.timeMin,today+'T00:00:00.000Z');assert.equal(query.timeMax,addDays(today,30)+'T00:00:00.000Z');
+  assert.deepEqual(googleWindow('America/Bogota',new Date('2026-10-30T02:00:00Z')),{from:'2026-10-29',to:'2026-11-27',end:'2026-11-28'});
+});
+test('manual receive imports Google without any outgoing event writes and leaves local changes pending',async t=>{
+  const {store,api,sync,date,addClass}=await fixture(t);addClass();api.set('personal',event('phone',date));
+  await sync.run('pull');assert.equal(store.busyBlocks(date,date).length,1);assert.equal(api.events.get('target').size,0);
+  assert.ok(api.requests.every(request=>request.method==='GET'));assert.equal(sync.status().state,'pending');assert.ok(sync.status().lastPull);assert.equal(sync.status().lastSync,'');assert.equal(sync.status().lastPush,'');
+  api.requests=[];await sync.run('push');assert.equal(api.events.get('target').size,1);assert.ok(sync.status().lastPush);
+  assert.ok(api.requests.findIndex(r=>r.method==='POST')>api.requests.findIndex(r=>r.route==='/calendars/work/events'&&r.method==='GET'));
+});
+test('manual receive on first connection does not create an agenda and reports receipt separately from full synchronization',async t=>{
+  const {api,sync,date}=await fixture(t);sync.config.calendarId='';api.set('personal',event('phone',date));
+  await sync.run('pull');assert.ok(api.requests.every(request=>request.method==='GET'));assert.equal(sync.status().state,'received');assert.equal(sync.config.calendarId,'');
+});
+test('a linked event moved outside the month is aligned once, then preserved without continued out-of-window polling',async t=>{
+  const {store,api,sync,date,addClass}=await fixture(t),row=addClass();await sync.run();
+  store.saveSession({...row,date:addDays(date,90),status:'planned'},row.id);await sync.run('push');
+  const saved=[...api.events.get('target').values()][0];assert.ok(saved.start.dateTime.startsWith(addDays(date,90)));
+  api.requests=[];await sync.run();assert.equal(api.events.get('target').size,1);assert.ok(api.requests.every(r=>r.method==='GET'&&!/\/events\//.test(r.route)));
+});
 
 test('Google is imported first, every readable calendar becomes striped busy, and writes stay in Amapola',async t=>{
   const {store,api,sync,date,addClass}=await fixture(t);const row=addClass();

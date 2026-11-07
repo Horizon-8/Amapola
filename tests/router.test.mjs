@@ -77,6 +77,11 @@ test('Google controls require local authentication and expose setup state withou
   const status=await request('/api/google/status',{headers});assert.doesNotMatch(status.text(),/not-a-real-secret/);
   assert.equal((await request('/api/google/client',{method:'POST',headers:{...headers,Origin:'https://wrong.example'},data:{}})).code,403);
   assert.equal((await request('/oauth/google/callback?state=wrong&code=wrong')).code,400);
+  const directions=[];app.google.secrets.refreshToken='test-only';app.google.run=async direction=>{directions.push(direction);};
+  assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'pull'}})).code,202);
+  assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'push'}})).code,202);
+  assert.deepEqual(directions,['pull','push']);
+  assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'invalid'}})).code,400);
 });
 test('HTTP follow-up and overlap previews preserve data and use normal session authentication',async t=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-followup-routes-')),app=await startApp({dataDir:dir,port:0});
