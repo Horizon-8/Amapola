@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { readFileSync } from 'node:fs';
 import { paymentState, hasEnded } from '../app/public/class-utils.mjs';
+import { uiDefinitions } from './ui-fixture.mjs';
 function ui({setTimeoutImpl=fn=>{fn();return 1;}}={}){
-  const source=readFileSync(new URL('../app/public/app.js',import.meta.url),'utf8'),nodes={},events=[];
+  const nodes={},events=[];
   const node=selector=>nodes[selector]??={open:false,innerHTML:'',textContent:'',classList:{toggle(){}},showModal(){this.open=true;events.push('open');},close(){this.open=false;events.push('close');}};
   const context=vm.createContext({URL,paymentState,hasEnded,setTimeout:setTimeoutImpl,clearTimeout(){},window:{matchMedia:()=>({addEventListener(){}})},localStorage:{getItem:()=>null},location:{hash:'#calendario'},document:{querySelector:node,querySelectorAll:()=>[]}});
-  vm.runInContext(source.slice(source.indexOf('/* Amapola'),source.indexOf("document.addEventListener('click'")),context);
+  vm.runInContext(uiDefinitions(),context);
   vm.runInContext('S.opening=false;',context);
   return {context,nodes,events};
 }

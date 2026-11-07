@@ -180,10 +180,10 @@
 .calendar-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:1}
 .calendar-sync-controls{display:flex;align-items:center;gap:8px;margin:0}
 .calendar-toolbar .btn{padding:8px 11px;min-height:36px;font-size:11px}
-.btn.google-receive{background:#dcefe8;border-color:#96c8b3;color:#175940}
-.btn.google-send{background:var(--rose-bg);border-color:var(--rose);color:var(--rose-dark)}
-.btn.google-receive:hover{background:#c7e5d8;border-color:#327d5c;color:#164c38}
-.btn.google-send:hover{background:var(--rose);color:var(--surface)}
+
+
+
+
 .calendar-sync-controls .btn:disabled{opacity:1;cursor:not-allowed;filter:saturate(.55);border-style:dashed}
 .btn.google-ok{background:#d9efdf;border-color:#72ad89;color:#225936}
 .btn.google-failed{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border-color:var(--danger);color:var(--danger)}
@@ -203,10 +203,10 @@
 .calendar-agendas .calendar-visibility input{accent-color:var(--rose);margin:3px 5px 0 0;flex-shrink:0}
 .calendar-agendas .calendar-visibility span{overflow-wrap:anywhere}
 .calendar-agendas .calendar-visibility small{padding:9px 7px 1px;margin-top:5px;border-top:1px solid var(--line);line-height:1.6}
-[data-theme=dark] .btn.google-receive{background:#244a3c;border-color:#5eab88;color:#c4edda}
-[data-theme=dark] .btn.google-receive:hover{background:#305f4d;color:#e4fff1}
-[data-theme=dark] .btn.google-send{background:#593447;border-color:#cf7299;color:#ffd0e1}
-[data-theme=dark] .btn.google-send:hover{background:#75445e}
+
+
+
+
 [data-theme=dark] .btn.google-ok{background:#254332;border-color:#558968;color:#c5edd2}
 [data-theme=dark] .btn.google-failed{background:#4e2b38;border-color:var(--danger);color:var(--danger)}
 /* Welcome covers local loading and the real Google receipt, never an upload. */
@@ -225,3 +225,10 @@
 @keyframes welcome-flower{0%,100%{transform:rotate(-12deg) scale(.94)}50%{transform:rotate(18deg) scale(1.04)}}
 @keyframes welcome-track{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
 @media(max-width:1250px){.calendar-toolbar{gap:10px}.calendar-tools{order:3;flex-basis:100%;justify-content:flex-start}.calendar-toolbar>.view-toggle{margin-left:auto}.calendar-tools .calendar-agendas{margin-left:auto}.calendar-page .stat-card{padding:10px 12px}.calendar-page .stat-value{font-size:21px}}
+
+/* Same rose palette; opposite gradient directions identify receive and send. */
+.calendar-sync-controls .btn.google-receive,.calendar-sync-controls .btn.google-send{--google-gradient-start:color-mix(in srgb,var(--rose-bg) 85%,var(--surface));--google-gradient-end:color-mix(in srgb,var(--rose) 32%,var(--surface));border-color:var(--rose);color:var(--rose-dark);background:linear-gradient(180deg,var(--google-gradient-start),var(--google-gradient-end))}
+.calendar-sync-controls .btn.google-send{background:linear-gradient(0deg,var(--google-gradient-start),var(--google-gradient-end))}
+.calendar-sync-controls .btn.google-receive:hover,.calendar-sync-controls .btn.google-send:hover{--google-gradient-end:color-mix(in srgb,var(--rose) 48%,var(--surface));color:var(--rose-dark)}
+.calendar-sync-controls .btn.google-ok{box-shadow:inset 0 -2px 0 var(--success)}
+.calendar-sync-controls .btn.google-failed{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border-color:var(--danger);color:var(--danger)}

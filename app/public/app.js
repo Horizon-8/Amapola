@@ -1,11 +1,20 @@
-let attachCalendarGestures, attachCalendarClock, paymentState, hasEnded;
+let attachCalendarGestures, attachCalendarClock, paymentState, hasEnded, createAssetsUI, createCalendarUI, createStudentsUI, createClassesUI, createPlanningUI, createGoogleUI, createSettingsUI, createFormsUI, installCloseGuard;
 try {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(10000) });
   const health = await response.json();
-  if (!response.ok || health.app !== 'amapola' || health.version !== '0.8.0') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
+  if (!response.ok || health.app !== 'amapola' || health.version !== '0.8.1') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
   ({ attachCalendarGestures } = await import('./calendar-interactions.mjs'));
   ({ attachCalendarClock } = await import('./calendar-clock.mjs'));
   ({ paymentState, hasEnded } = await import('./class-utils.mjs'));
+  ({ createAssetsUI } = await import('./ui/assets.mjs'));
+  ({ createCalendarUI } = await import('./ui/calendar.mjs'));
+  ({ createStudentsUI } = await import('./ui/students.mjs'));
+  ({ createClassesUI } = await import('./ui/classes.mjs'));
+  ({ createPlanningUI } = await import('./ui/planning.mjs'));
+  ({ createGoogleUI } = await import('./ui/google.mjs'));
+  ({ createSettingsUI } = await import('./ui/settings.mjs'));
+  ({ createFormsUI } = await import('./ui/forms.mjs'));
+  ({ installCloseGuard } = await import('./ui/close-guard.mjs'));
 } catch (error) {
   const target = document.getElementById('main');
   const panel = document.createElement('div'); panel.className = 'empty-state';
@@ -18,36 +27,8 @@ try {
   throw error;
 }
 /* Amapola — no business data is stored in the browser. Only appearance is local. */
-const icons = {
- calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18m-13 5h2m4 0h2"/>',
- users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',
- plan:'<rect x="5" y="4" width="15" height="18" rx="2"/><path d="M9 2h7v4H9zM9 11h7m-7 5h7"/>',
- chart:'<path d="M4 3v17h17M8 16v-5m5 5V7m5 9V4"/>',
- settings:'<path d="m9 3-.5 2-2 .9-1.9-.6-2 3.4L4 10v2l-1.4 1.3 2 3.4 1.9-.5 2 .9.5 2h4l.5-2 2-.9 1.9.5 2-3.4L20 12v-2l1.4-1.3-2-3.4-1.9.6-2-.9-.5-2z"/><circle cx="12" cy="11" r="3"/>',
- plus:'<path d="M12 5v14M5 12h14"/>', search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/>',
- question:'<path d="M8 7a4 4 0 0 1 8 0c0 3-4 3-4 6m0 5v.1"/>',
- cancel:'<path d="m4 4 16 16M4 20 20 4"/>',
- checks:'<path d="m2 12 4 4L16 6m-5 10L21 6"/>',
- dollar:'<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6m6-17v20"/>',
- left:'<path d="m14 6-6 6 6 6"/>', right:'<path d="m10 6 6 6-6 6"/>', close:'<path d="m6 6 12 12M6 18 18 6"/>',
- edit:'<path d="m16 3 5 5-12 12-6 1 1-6zM14 5l5 5"/>', trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>',
- online:'<rect x="4" y="3" width="16" height="13" rx="2"/><path d="M12 16v5m-5 0h10M8 12h8"/>',
- home:'<path d="m3 11 9-8 9 8M5 10v11h14V10m-10 11v-7h6v7"/>',
- travel:'<path d="m5 7 2-4h10l2 4m-16 3 2-3h14l2 3v8H3zm2 8v3m14-3v3M7 13h1m8 0h1"/>',
- clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', money:'<rect x="2" y="5" width="20" height="14" rx="3"/><circle cx="12" cy="12" r="3"/><path d="M6 12h.01M18 12h.01"/>',
- moon:'<path d="M20.8 13a9 9 0 0 1-9.8-9.8A9 9 0 1 0 20.8 13Z"/>',
- sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
- system:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4m-4 0h8"/>',
- download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>', cloud:'<path d="M7 18a5 5 0 1 1 0-10 6 6 0 0 1 11-2 5 5 0 0 1 0 12m-6 3V11m-4 4 4-4 4 4"/>',
- info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>', check:'<path d="m5 12 4 4L19 6"/>',
- repeat:'<path d="m17 2 4 4-4 4M3 11V8a2 2 0 0 1 2-2h16M7 22l-4-4 4-4m14-1v3a2 2 0 0 1-2 2H3"/>',
- power:'<path d="M12 2v10M5 5a9 9 0 1 0 14 0"/>', mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>',
- whatsapp:'<path d="M21 11.5a9 9 0 0 1-13.5 7.8L3 21l1.6-5A9 9 0 1 1 21 11.5Z"/><path d="M8 7c0 5 4 8 8 8l1-2-3-1-1 1-3-3 1-1-1-3Z"/>',
- messenger:'<path d="M21 11a9 8 0 0 1-13 7l-4 2 .5-4A9 8 0 1 1 21 11Z"/><path d="m7 13 4-4 3 3 3-3"/>',
- instagram:'<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".7"/>',
- phone:'<path d="m6 3 4 1-1 5 6 6 5-1 1 4c-3 7-21-11-15-15Z"/>', other:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
-};
-const icon = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.info}</svg>`;
+const { icon } = createAssetsUI();
+
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -89,33 +70,7 @@ const studentStatus = s => s.stage === 'prospect' ? 'prospect' : s.active ? 'act
 const studentStatusNames = {prospect:'En conversación',active:'Activo',inactive:'Inactivo'};
 const studentBadge = s => `<span class="badge student-status ${studentStatus(s)}"><span class="status-marker" aria-hidden="true"></span>${studentStatusNames[studentStatus(s)]}</span>`;
 const channelBadge = s => `<span class="badge channel-badge ${esc(s.channel)}">${icon(s.channel)}${esc(channelNames[s.channel])}</span>`;
-function webLink(value) {
-  try { const u=new URL(value); return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password ? u.href : ''; } catch { return ''; }
-}
-function noteLinks(value) { return (String(value||'').match(/https?:\/\/[^\s<>"']+/gi)||[]).map(v=>v.replace(/[.,;!?]+$/,'')).filter(webLink); }
-function linkedNotes(value) {
-  const source=String(value||''); let result='',offset=0;
-  for(const match of source.matchAll(/https?:\/\/[^\s<>"']+/gi)) {
-    const url=match[0].replace(/[.,;!?]+$/,'');
-    result+=esc(source.slice(offset,match.index));
-    result+=webLink(url)?`<a href="${esc(webLink(url))}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`:esc(url);
-    offset=match.index+url.length;
-  }
-  return result+esc(source.slice(offset));
-}
-function contactLinks(s) {
-  const links=[], phone=String(s.phone||'').trim(), digits=phone.replace(/\D/g,'').replace(/^00/,'');
-  if(/^(\+|00)[\d\s().-]+$/.test(phone)&&/^[1-9]\d{7,14}$/.test(digits)) links.push(['whatsapp','WhatsApp',`https://wa.me/${digits}`]);
-  if(s.email) links.push(['mail','Email',`mailto:${encodeURIComponent(s.email)}`]);
-  if(webLink(s.messenger)) links.push(['messenger','Messenger',webLink(s.messenger)]);
-  if(phone&&/^\+?[\d\s().-]+$/.test(phone)) links.push(['phone','Llamar',`tel:${phone.replace(/[^+\d]/g,'')}`]);
-  for(const url of [...new Set(noteLinks(s.notes))].slice(0,3)) if(!links.some(l=>l[2]===webLink(url))) {
-    const host=new URL(url).hostname.toLowerCase(),instagram=host==='instagram.com'||host.endsWith('.instagram.com');
-    links.push([instagram?'instagram':'other',instagram?'Instagram':host,webLink(url)]);
-  }
-  links.sort((a,b)=>(b[0]===(s.channel==='email'?'mail':s.channel))-(a[0]===(s.channel==='email'?'mail':s.channel)));
-  return `<div class="contact-links">${links.map(([ico,label,url])=>`<a class="btn small contact-link ${ico}" href="${esc(url)}" ${url.startsWith('http')?'target="_blank" rel="noopener noreferrer"':''}>${icon(ico)}${esc(label)}</a>`).join('')}</div>`;
-}
+
 const priceInput = cents => (cents/100).toFixed(2);
 function parsePrice(value) { if (!/^\d{1,10}([.,]\d{1,2})?$/.test(value)) throw new Error('Indica una tarifa positiva con un máximo de dos decimales.'); const [a,b=''] = value.replace(',','.').split('.'); return Number(a)*100+Number(b.padEnd(2,'0')); }
 function toast(message, error=false) { const el=$('#toast'); el.textContent=message; el.className=`show${error?' error':''}`; clearTimeout(toast.timer); toast.timer=setTimeout(()=>el.className='',error?6500:4000); }
@@ -142,256 +97,13 @@ const newClass=studentId=>`<button class="btn primary" data-action="new-schedule
 const empty=(title,sub,action='')=>`<div class="empty-state"><span aria-hidden="true">✿</span><h3>${title}</h3><p>${sub}</p>${action}</div>`;
 const modalityIcon=row=>`<span class="modality-icon ${row.modality}" title="${modalityNames[row.modality]}" aria-hidden="true">${icon(row.modality)}</span>`;
 const modalityBadge=row=>`<span class="badge modality-badge ${row.modality}">${modalityIcon(row)}${modalityNames[row.modality]}</span>`;
-function statusBadge(row) {
-  return classStatusPill(row);
-}
+
 const classStatusNames={planned:'Por confirmar',confirmed:'Confirmada',completed:'Realizada',cancelled:'Cancelada'};
 const nextClassStatus=status=>status==='planned'?'confirmed':status==='confirmed'||status==='completed'?'cancelled':'planned';
-function classStatusPill(row,compact=false) {
-  const status=row.status||'planned',label=classStatusNames[status],next=classStatusNames[nextClassStatus(status)];
-  const symbol=status==='planned'?'question':status==='cancelled'?'cancel':status==='completed'?'checks':'check';
-  return `<button type="button" class="class-status ${status} ${compact?'compact':''}" data-action="class-status" data-id="${esc(row.id)}" data-class-status="${status}" aria-label="Clase de ${esc(row.studentName||fullname(studentBy(row.studentId)))}: ${label}. Cambiar a ${next}" title="${label}. Clic: ${next}. Cambia solo esta sesión."><span class="pill-icon" aria-hidden="true">${icon(symbol)}</span>${compact?'':`<span>${label}</span>`}</button>`;
-}
-async function cycleClassStatus(id,button) {
-  if(button.disabled)return;
-  const row=findSession(id);if(!row)return;
-  const status=nextClassStatus(row.status);
-  const save=async()=>{await api(`/api/sessions/${encodeURIComponent(id)}/status`,'PUT',{status,expectedStatus:row.status});await refresh();await render();toast(`Clase: ${classStatusNames[status]}.`);};
-  button.disabled=true;
-  try {
-    if(row.status==='cancelled') {
-      const value={...row,status};
-      const result=await api('/api/conflicts','POST',{kind:'session',id,value});
-      if(result.total) {
-        modal('Reactivar esta clase','Al volver a ocupar este horario hay otras actividades.',conflictMarkup(result),cancelBtn+submitBtn('Reactivar clase'),async form=>{await confirmConflicts(form);await save();$('#dialog').close();});
-        setupConflicts('session',id,()=>value);return;
-      }
-    }
-    await save();
-  } finally {if(button.isConnected)button.disabled=false;}
-}
-function weekControls(){return `<div class="calendar-controls"><button class="icon-button" data-action="prev-week" aria-label="Semana anterior">${icon('left')}</button><span class="calendar-range">${range(S.week)}</span><button class="icon-button" data-action="next-week" aria-label="Semana siguiente">${icon('right')}</button><button class="btn small" data-action="today">Hoy</button></div>`;}
-function summary(report){return `<div class="stats"><div class="stat-card featured"><div class="stat-top"><span class="stat-icon">${icon('calendar')}</span>Esta semana</div><div class="stat-value">${report.current.count} <span style="font:14px 'Segoe UI',sans-serif">clases</span></div><div class="stat-caption">${num(report.current.hours)} horas para compartir conocimiento</div></div><div class="stat-card"><div class="stat-top"><span class="stat-icon">${icon('money')}</span>Ingresos estimados</div><div class="stat-value">${money(report.current.total)}</div><div class="stat-caption">Según las clases de la semana seleccionada</div></div><div class="stat-card"><div class="stat-top"><span class="stat-icon">${icon('users')}</span>Alumnos activos</div><div class="stat-value">${S.students.filter(s=>s.active).length}</div><div class="stat-caption"><a class="rose" href="#alumnos">Cada alumno, un camino diferente ${icon('right')}</a></div></div></div>`;}
 
 const paymentMethodNames = {'':'Sin especificar',cash:'Efectivo',transfer:'Transferencia bancaria',card:'Tarjeta',nequi:'Nequi',daviplata:'DaviPlata',paypal:'PayPal',other:'Otro'};
 const paymentLabels = {paid:'Pagada',overdue:'Vencida sin pagar',pending:'Pendiente',nocharge:'Sin cobro'};
-function classClock() {
-  const date=new Date(),timeZone=S.settings.timezone;
-  return {today:new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(date),time:new Intl.DateTimeFormat('en-GB',{timeZone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date)};
-}
-function paymentPill(row,compact=false) {
-  const clock=classClock(),state=paymentState(row,clock.today,clock.time),label=paymentLabels[state];
-  return `<button type="button" class="payment-pill ${state} ${compact?'compact':''}" data-action="payment" data-id="${esc(row.id)}" data-payment-state="${state}" aria-label="Pago de ${esc(row.studentName||fullname(studentBy(row.studentId)))}: ${label}. Registrar pago" title="${label} · ${paymentMethodNames[row.paymentMethod||'']}"><span class="pill-icon" aria-hidden="true">${icon('dollar')}</span>${compact?'':`<span>${label}</span>`}</button>`;
-}
-function findSession(id) { return [...(S.rows||[]),...(S.history||[])].find(r=>r.id===id); }
-function validateSlot(v) {
-  if(!/^([01]\d|2[0-3]):(00|15|30|45)$/.test(v.time)||!Number.isInteger(v.duration)||v.duration<15||v.duration>720||v.duration%15) throw new Error('El inicio y la duración deben ser múltiplos de 15 minutos.');
-  if(min(v.time)+v.duration>1440)throw new Error('La clase debe terminar el mismo día.');
-}
-function classTable(rows) {
-  if(!rows.length)return empty('No hay clases en esta selección','Cambia el periodo o los filtros para consultar otras clases.');
-  return `<div class="table-scroll"><table><thead><tr><th>Fecha y hora</th><th>Alumno / clase</th><th>Modalidad</th><th>Estado de clase</th><th>Pago</th><th>Método de pago</th><th>Tarifa</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${fmtDate(r.date,{day:'numeric',month:'short',year:'numeric'})}<div class="student-secondary">${r.time} – ${end(r)} · ${r.duration} min</div></td><td><a class="student-cell" href="#alumnos/${r.studentId}">${avatar(studentBy(r.studentId))}<div><div class="student-name">${esc(r.studentName||fullname(studentBy(r.studentId)))}</div><div class="student-secondary">${esc(r.title)}</div></div></a></td><td>${modalityBadge(r)}</td><td>${statusBadge(r)}</td><td>${paymentPill(r)}</td><td>${esc(paymentMethodNames[r.paymentMethod||''])}</td><td>${money(r.price)}</td><td><div class="row-actions"><button class="icon-button" data-action="edit-session" data-id="${esc(r.id)}" aria-label="Editar clase del ${r.date}">${icon('edit')}</button><button class="icon-button delete-class" data-action="delete-session" data-id="${esc(r.id)}" aria-label="Eliminar solo esta clase del ${r.date}">${icon('trash')}</button></div></td></tr>`).join('')}</tbody></table></div>`;
-}
-function renderClasses(data) {
-  S.rows=data.rows;S.classPage=data.page;
-  const f=S.classFilters;
-  return heading('HISTORIAL Y SEGUIMIENTO DE PAGOS','Clases','Todas tus clases y sus pagos, sin tener que abrir cada alumno.',newClass())+
-    `<div class="tabs">${[['past','Clases pasadas'],['future','Próximas clases'],['all','Todas']].map(([key,label])=>`<button class="tab ${S.classPeriod===key?'active':''}" data-action="class-period" data-period="${key}">${label}</button>`).join('')}</div>`+
-    `<section class="panel"><form id="class-filters" class="class-filters">${inputField('from','Desde',f.from,'date','min="2000-01-01" max="2100-12-31"')}${inputField('to','Hasta',f.to,'date','min="2000-01-01" max="2100-12-31"')}${selectField('student','Alumno',f.student,[['','Todos los alumnos'],...S.students.map(s=>[s.id,fullname(s)])])}${selectField('payment','Pago',f.payment,[['all','Todos los pagos'],['paid','Pagadas'],['unpaid','Sin pagar'],['overdue','Vencidas sin pagar'],['pending','Pendientes futuras']])}${selectField('method','Método',f.method,[['','Todos los métodos'],...Object.entries(paymentMethodNames).filter(([key])=>key)])}${selectField('status','Estado de clase',f.status,[['','Todos los estados'],...Object.entries(classStatusNames)])}<div class="button-row"><button class="btn primary" type="submit">Aplicar filtros</button><button class="btn" type="button" data-action="class-clear">Limpiar</button></div></form></section>`+
-    `<div class="stats payment-totals"><div class="stat-card"><div class="stat-top">Pagado</div><div class="stat-value">${money(data.totals.paid)}</div></div><div class="stat-card"><div class="stat-top">Vencido sin pagar</div><div class="stat-value">${money(data.totals.overdue)}</div></div><div class="stat-card"><div class="stat-top">Pendiente futuro</div><div class="stat-value">${money(data.totals.pending)}</div></div></div>`+
-    `<section class="panel"><div class="panel-header"><h2>${data.total} clases</h2><span class="small-text muted">Totales de toda la selección · ${S.classPeriod==='past'?'Histórico completo':`Próximas hasta ${fmtDate(data.futureUntil,{day:'numeric',month:'short',year:'numeric'})}`}</span></div>${classTable(data.rows)}<div class="panel-header pagination"><button class="btn small" data-action="class-prev" ${data.page<=1?'disabled':''}>${icon('left')} Anterior</button><span class="muted small-text">Página ${data.page} de ${data.pages} · 50 por página</span><button class="btn small" data-action="class-next" ${data.page>=data.pages?'disabled':''}>Siguiente ${icon('right')}</button></div></section><p class="inline-help">Pulsa la pastilla $ para registrar el pago. Blanco: pendiente; verde: pagada; rojo: la clase terminó y sigue sin pagar. Las canceladas sin pago y las gratuitas no generan deuda.</p>`;
-}
 
-function layoutEvents(events) {
-  const result=[]; let group=[], boundary=-1;
-  function flush(){if(!group.length)return;const lanes=[];for(const row of group){let lane=lanes.findIndex(v=>v<=min(row.time));if(lane<0)lane=lanes.length;lanes[lane]=min(row.time)+row.duration;row.lane=lane;}for(const row of group)result.push({...row,lanes:lanes.length});group=[];boundary=-1;}
-  for(const original of [...events].sort((a,b)=>min(a.time)-min(b.time))){const row={...original};if(min(row.time)>=boundary)flush();group.push(row);boundary=Math.max(boundary,min(row.time)+row.duration);}flush();return result;
-}
-function calendarGrid(rows) {
-  const scale=calendarScale,height=1440*scale;
-  const headers=Array.from({length:7},(_,i)=>{const d=plusDays(S.week,i);return `<div class="calendar-day ${d===S.today?'today':''}" data-date="${d}"><span>${shortDays[i]}</span><strong class="day-number">${Number(d.slice(-2))}</strong>${rows.filter(r=>r.date===d&&r.allDay).length?`<span class="google-all-day" title="${esc(rows.filter(r=>r.date===d&&r.allDay).map(r=>r.title).join(' · '))}">Busy · ${esc(rows.filter(r=>r.date===d&&r.allDay).map(r=>r.title).join(' · '))}</span>`:''}</div>`;}).join('');
-  const labels=Array.from({length:24},(_,i)=>`<span class="hour-label" style="top:${i*60*scale}px">${String(i).padStart(2,'0')}:00</span>`).join('');
-  const lines=Array.from({length:96},(_,i)=>`<span class="calendar-grid-line ${i%4===0?'hour':i%2===0?'half':'quarter'}" style="top:${i*15*scale}px"></span>`).join('');
-  const lanes=Array.from({length:7},(_,i)=>{
-    const date=plusDays(S.week,i),events=layoutEvents(rows.filter(r=>r.date===date));
-    return `<div class="day-lane ${date===S.today?'today':''} ${i>4?'weekend':''}" data-date="${date}" style="height:${height}px">${events.map(r=>{
-      const busy=r.kind==='busy',inline=r.duration<60;
-      return `<div role="button" tabindex="0" class="calendar-event ${busy?'busy-event':r.status} ${r.source==='google'?'google-busy':''} ${r.needsAssignment?'google-pending':''} ${inline?'inline-event':''} ${r.duration<=15?'short-event':''}" data-action="${r.source==='google'?'google-event':busy?'edit-busy':'edit-session'}" data-read-only="${!!r.readOnly}" data-id="${esc(r.id)}" style="--student:${busy?'#a9b0bc':esc(r.color)};top:${min(r.time)*scale}px;height:${r.duration*scale}px;left:calc(${r.lane*100/r.lanes}% + 3px);width:calc(${100/r.lanes}% - 6px);z-index:${r.lane+2}" title="${busy?`Ocupada · ${esc(r.title)}`:`${esc(r.studentName)} · ${esc(r.title)} · ${modalityNames[r.modality]}`} · ${r.time}–${end(r)}" aria-label="${busy?`Ocupada: ${esc(r.title)}`:esc(r.studentName)}, ${r.time}. Arrastra para mover o pulsa para editar.">${r.readOnly?'':'<span class="resize-handle start" data-resize="start" title="Ajustar inicio"></span>'}<div class="event-top">${busy?`<span class="modality-icon busy" aria-hidden="true">${icon('clock')}</span>`:modalityIcon(r)}<span class="event-time">${r.time}${!inline&&r.duration>=90?` – ${end(r)}`:''}</span>${inline?`<span class="event-inline-name">${esc(busy?r.title:r.studentName)}</span>`:''}${busy?'':`<span class="event-actions">${classStatusPill(r,true)}${paymentPill(r,true)}</span>`}</div>${!inline?`<span class="event-name">${esc(busy?r.title:r.studentName)}</span>`:''}${r.duration>=90?`<span class="event-sub">${r.needsAssignment?'Google · Completar clase':r.source==='google'?'Busy · '+esc(r.calendarName):busy?'No disponible para clases':esc(r.title)}</span>`:''}${r.readOnly?'':'<span class="resize-handle finish" data-resize="end" title="Ajustar fin"></span>'}</div>`;
-    }).join('')}</div>`;
-  }).join('');
-  return `<div class="calendar-scroll"><div class="calendar"><div class="calendar-days"><div></div>${headers}</div><div class="calendar-body" data-scale="${scale}"><div class="time-labels" style="height:${height}px">${labels}</div>${lanes}<div class="calendar-grid-lines" aria-hidden="true">${lines}</div></div></div></div>`;
-}
-function legend(rows) {
-  const ids=[...new Set(rows.filter(r=>r.kind!=='busy').map(r=>r.studentId))];
-  return `<div class="calendar-legend">${ids.slice(0,7).map(id=>{const s=studentBy(id);return `<a class="legend-item" href="#alumnos/${id}"><span class="color-dot" style="--student:${esc(s.color)}"></span>${esc(s.firstName)}</a>`;}).join('')}<span class="legend-spacer"></span>${Object.entries(modalityNames).map(([k,v])=>`<span class="legend-item">${modalityIcon({modality:k})}${v}</span>`).join('')}<span class="legend-item"><span class="modality-icon busy">${icon('clock')}</span>Ocupada</span></div>`;
-}
-function agenda(rows) {
-  if(!rows.length)return empty('Una semana por escribir','Añade una clase o un bloqueo de disponibilidad para organizar tu semana.',newClass());
-  return [...new Set(rows.map(r=>r.date))].map(date=>`<div class="agenda-day">${fmtDate(date,{weekday:'long',day:'numeric',month:'long'})}</div>${rows.filter(r=>r.date===date).map(r=>r.kind==='busy'?`<div class="agenda-item busy-agenda ${r.source==='google'?'google-busy':''} ${r.needsAssignment?'google-pending':''}" role="button" tabindex="0" data-action="${r.source==='google'?'google-event':'edit-busy'}" data-id="${esc(r.id)}"><div class="agenda-time">${r.time}<div class="student-secondary">${end(r)}</div></div><span class="modality-icon busy">${icon('clock')}</span><div class="agenda-info"><div class="student-name">${esc(r.title)}</div><div class="student-secondary">${r.needsAssignment?'Google · Completar clase':r.source==='google'?'Busy · '+esc(r.calendarName):'Ocupada · No disponible para clases'}</div></div><span class="badge">${r.duration} min</span>${icon('right')}</div>`:`<div class="agenda-item" role="button" tabindex="0" data-action="edit-session" data-id="${esc(r.id)}"><div class="agenda-time">${r.time}<div class="student-secondary">${end(r)}</div></div>${avatar(studentBy(r.studentId))}<div class="agenda-info"><div class="student-name">${esc(r.studentName)}</div><div class="student-secondary">${esc(r.title)} · ${r.duration} min</div></div>${modalityBadge(r)}${statusBadge(r)}${paymentPill(r)}<span class="price">${money(r.price)}</span>${icon('right')}</div>`).join('')}`).join('');
-}
-function syncOverlay(status) {
-  if(S.opening){const message=$('#startup-message');if(message&&status?.state==='syncing')message.textContent=status.operation?.stage||status.message||'Recibiendo de Google…';return;}
-  const dialog=$('#google-progress');if(!dialog)return;
-  if(status?.state==='syncing'){
-    const op=status.operation||{};
-    $('#google-progress-title').textContent=op.direction==='push'?'Enviando a Google':'Recibiendo de Google';
-    $('#google-progress-message').textContent=op.stage||status.message||'Sincronización en curso…';
-    $('#google-progress-count').textContent=op.total?`${op.done} / ${op.total}`:'';
-    if(!dialog.open)dialog.showModal();
-  }else if(dialog.open&&!S.googleSyncPromise)dialog.close();
-}
-async function runGoogleSync(direction) {
-  if(S.googleSyncPromise)return S.googleSyncPromise;
-  const task=(async()=>{
-    syncOverlay({state:'syncing',operation:{direction,stage:'Conectando con Google…'}});
-    try {
-      let status=await api('/api/google/sync','POST',{direction}),operation=status.operation?.id;
-      if(!operation)throw Error(status.message||'No se pudo iniciar la sincronización.');
-      S.google=status;googleSyncStatus();syncOverlay(status);
-      while(status.state==='syncing'){
-        await new Promise(resolve=>setTimeout(resolve,400));status=await api('/api/google/status');
-        if(status.operation?.id!==operation)throw Error('No se puede confirmar este intercambio. Vuelve a intentarlo.');
-        S.google=status;googleSyncStatus();syncOverlay(status);
-      }
-      if(status.operation?.ok!==true)throw Error(status.operation?.error||status.message||'El intercambio no terminó.');
-      await refresh();await render();toast(direction==='pull'?'Google recibido.':'Agenda Amapola enviada a Google.');
-    }finally{const dialog=$('#google-progress');if(dialog?.open)dialog.close();}
-  })();
-  S.googleSyncPromise=task;
-  try{return await task;}finally{S.googleSyncPromise=null;}
-}
-function calendarConnectionWarning(message) {
-  modal('Agendas no actualizados','Puedes seguir trabajando con los datos guardados en este PC.',`<div class="notice warning">${esc(message||'No hay conexión con Google. Los agendas no se han actualizado.')}</div><p class="help-text">Los cambios locales se conservan. Actualiza cuando vuelva la conexión.</p>`,
-    '<button class="btn" type="button" data-action="close-dialog">Continuar sin actualizar</button>'+(S.google?.connected&&!S.google?.paused?'<button class="btn primary" type="button" data-action="google-pull">Reintentar recepción</button>':'<button class="btn primary" type="button" data-action="google-settings">Revisar conexión</button>'),async()=>{});
-}
-async function checkCalendarEntry() {
-  if(!S.google?.configured||S.googleSyncPromise)return;
-  const entry=++S.calendarConnectionCheck;
-  try{
-    const status=await api('/api/google/check','POST',{});S.google=status;googleSyncStatus();
-    if(entry!==S.calendarConnectionCheck||(location.hash&&location.hash!=='#calendario'))return;
-    if(status.online===false&&!$('#dialog').open)calendarConnectionWarning(status.connectionIssue||status.message);
-  }catch(error){if(entry===S.calendarConnectionCheck&&(!location.hash||location.hash==='#calendario')&&!$('#dialog').open)calendarConnectionWarning(error.message);}
-}
-async function openApplication() {
-  S.opening=true;
-  const animation=new Promise(resolve=>setTimeout(resolve,window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:1700));
-  let warning='',ready=false;
-  try{
-    await refresh();
-    const g=S.google||{};
-    if(g.connected&&!g.paused){try{await runGoogleSync('pull');}catch(error){warning=error.message;}}
-    else if(g.configured&&!g.connected)warning='Google no está conectado. Los agendas no se han actualizado.';
-    await render();ready=true;
-  }catch(error){$('#main').innerHTML=empty('No se pudo conectar',esc(error.message),'<button class="btn" data-action="retry">Reintentar</button>');}
-  finally{
-    await animation;
-    const screen=$('#startup-screen');if(screen)screen.hidden=true;
-    $$('[data-opening-inert]').forEach(element=>element.inert=false);
-    S.opening=false;S.startupHandled=true;
-  }
-  if(ready&&warning)calendarConnectionWarning(warning);
-  else if(ready&&S.google?.paused)toast('Google está en pausa después de la restauración. Revisa la conexión en Mi información.',true);
-}
-async function shutdownLocalApp() {
-  await api('/api/shutdown','POST',{});disposeCalendar();$('#main').innerHTML=empty('Hasta tu próxima clase','Amapola está cerrada. Puedes cerrar esta pestaña.');toast('Aplicación cerrada.');
-}
-function shutdownPrompt() {
-  const canSend=S.google?.connected&&!S.google?.paused;
-  modal('¿Enviar a Google antes de cerrar?',canSend?'Los cambios locales se guardan en este PC.':'Google no está conectado o está en pausa.',
-    '<p>Puedes enviar el agenda Amapola a Google antes de cerrar, o cerrar conservando los cambios locales pendientes.</p>',
-    cancelBtn+'<button class="btn" type="button" data-action="google-close-without">Cerrar sin enviar</button>'+(canSend?submitBtn('Enviar y cerrar'):''),async()=>{await runGoogleSync('push');await shutdownLocalApp();$('#dialog').close();});
-}
-function calendarVisibilityControls() {
-  const g=S.google||{},hidden=new Set(g.hiddenCalendarIds||[]),choices=[{id:'$amapola',title:'Amapola · cursos'},{id:'$local-busy',title:'Ocupada · local'}];
-  for(const calendar of g.calendars||[])if(calendar.id!==g.calendarId&&(g.sourceIds===null||g.sourceIds?.includes(calendar.id)))choices.push(calendar);
-  return `<details class="calendar-agendas" id="calendar-agendas"><summary title="Elegir los agendas visibles">${icon('calendar')}<span>Agendas</span><span class="agenda-count">${choices.filter(c=>!hidden.has(c.id)).length}/${choices.length}</span><span class="agenda-chevron" aria-hidden="true">⌄</span></summary><fieldset class="calendar-visibility"><legend>Agendas visibles</legend>${choices.map(c=>`<label><input type="checkbox" data-calendar-visibility="${esc(c.id)}" ${hidden.has(c.id)?'':'checked'}><span>${esc(c.title)}</span></label>`).join('')}<small>Ocultar no desactiva la sincronización ni los avisos de solapamiento.</small></fieldset></details>`;
-}
-function calendarRowVisible(row) {
-  const g=S.google||{},hidden=new Set(g.hiddenCalendarIds||[]);
-  return row.kind!=='busy'?!hidden.has('$amapola'):row.source!=='google'?!hidden.has('$local-busy'):!hidden.has(row.calendarId)&&!(row.calendarId===g.calendarId&&hidden.has('$amapola'));
-}
-function googleClassOrigin(row) {
-  const link=S.google?.classLinks?.find(l=>l.sessionId===row.id||l.key===row.id||row.scheduleId&&l.key===`${row.scheduleId}@${row.originalDate}`);
-  return `<div class="notice"><div><strong>Agenda: ${esc(link?.calendarName||'Amapola')}</strong><div class="small-text">${link?.linked?(link.gone?'El evento fue eliminado en Google. Enviar lo volverá a crear.':'Clase vinculada a Google.'):'Clase local pendiente de enviar a Google.'}</div></div></div>`;
-}
-
-function googleSyncStatus() {
-  const g=S.google||{state:'disconnected'},labels={disconnected:'Google sin conectar',paused:'Google en pausa',syncing:'Sincronizando…',pending:'Cambios por enviar',received:'Datos Google recibidos',sent:'Amapola enviada a Google',synced:'Google sincronizado',offline:'Google sin conexión',error:'Error de sincronización',review:'Google: revisar'};
-  $$('[data-google-direction]').forEach(button=>{button.disabled=!g.connected||g.state==='syncing'||g.state==='paused';const pull=button.dataset.googleDirection==='pull';button.classList.toggle('google-ok',!!(pull?g.lastPull&&!g.lastPullError:g.lastPush&&!g.lastPushError));button.classList.toggle('google-failed',!!(pull?g.lastPullError:g.lastPushError));});
-  const target=$('#google-sync-control');if(!target)return;
-  const html=`<span class="sync-state ${esc(g.state)}" role="status">${icon(g.state==='synced'?'check':g.state==='syncing'?'repeat':'cloud')}${labels[g.state]||labels.disconnected}</span><button class="btn small" data-action="${g.connected?'google-sync':'google-settings'}" ${g.state==='syncing'?'disabled':''} title="${esc(g.message||'Configurar Google Calendar')}" aria-label="${g.connected?'Actualizar desde Google':'Configurar Google Calendar'}">${icon('repeat')}<span>${g.connected?'Actualizar':'Configurar'}</span></button>`;
-  if(target.innerHTML!==html)target.innerHTML=html;
-}
-function calendarSyncControls() {
-  const g=S.google||{},disabled=!g.connected||g.state==='syncing'||g.state==='paused';
-  const stamp=direction=>{const date=direction==='pull'?g.lastPull:g.lastPush;return date?new Date(date).toLocaleString('es'):'Todavía sin confirmar';};
-  return `<div class="calendar-sync-controls" aria-label="Sincronización Google"><button class="btn google-receive ${g.lastPull&&!g.lastPullError?'google-ok':''}" data-action="google-pull" data-google-direction="pull" ${disabled?'disabled':''} title="Google → Amapola · Próximos 30 días. Google reemplaza los cursos vinculados; los nuevos locales se conservan. Última recepción: ${esc(stamp('pull'))}">${icon('download')} Actualizar desde Google</button><button class="btn google-send ${g.lastPush&&!g.lastPushError?'google-ok':''}" data-action="google-push" data-google-direction="push" ${disabled?'disabled':''} title="Amapola → Google · Envía directamente las clases locales, sin recibir cambios. Último envío: ${esc(stamp('push'))}${g.pending?' · Cambios locales pendientes':''}">${icon('cloud')} Enviar a Google</button></div>`;
-}
-function googleInboxPanel() {
-  const g=S.google||{},inbox=(g.inbox||[]).filter(r=>calendarRowVisible({...r,kind:'busy',source:'google'})),reviews=g.reviews||[];
-  if(!inbox.length&&!reviews.length)return '';
-  return `<section class="google-inbox panel"><div class="panel-header"><h2>Google · Por completar / revisar</h2><span class="badge">${inbox.length+reviews.length}</span></div><div class="panel-body">${inbox.map(r=>`<div class="google-inbox-item"><div><strong>${esc(r.title)}</strong><div class="student-secondary">${esc(r.calendarName)}${r.date?' · '+fmtDate(r.date)+' · '+r.time:''} · Falta alumno y tarifa</div></div><button class="btn small primary" data-action="google-complete" data-id="${esc(r.id)}">Completar clase</button></div>`).join('')}${reviews.map(r=>`<div class="google-inbox-item"><div><strong>${esc(r.title)}</strong><div class="student-secondary">${esc(r.message)}</div></div>${r.conflict?`<div class="button-row"><button class="btn small" data-action="google-resolve" data-key="${esc(r.key)}" data-choice="google">Conservar Google</button><button class="btn small danger" data-action="google-resolve" data-key="${esc(r.key)}" data-choice="amapola">Aplicar eliminación Amapola</button></div>`:''}</div>`).join('')}</div></section>`;
-}
-function googleSettings() {
-  const g=S.google||{},calendars=S.googleCalendars||[];
-  return `<section class="panel settings-section" id="google-section"><div class="panel-header"><div><h2>Sincronización con Google Calendar</h2><p class="subtitle small-text">Próximos 30 días. Recibir y enviar son acciones independientes.</p></div>${icon('cloud')}</div><div class="panel-body"><p class="small-text">Amapola escribe únicamente en su agenda <strong>Amapola</strong>. Los demás agendas se leen como bloques <strong>Busy</strong> grises y rayados. Para crear una clase desde el móvil, usa el agenda Amapola. En otro agenda, escribe Amapola al principio de su descripción.</p><div class="notice"><div><strong>${esc(g.message||'Google sin conectar')}</strong>${g.account?`<div>${esc(g.account)}</div>`:''}${g.lastPull?`<div class="small-text">Última recepción: ${esc(new Date(g.lastPull).toLocaleString('es'))}</div>`:''}${g.lastPush?`<div class="small-text">Último envío: ${esc(new Date(g.lastPush).toLocaleString('es'))}</div>`:''}</div></div><div class="button-row"><label class="btn file-label" for="google-client">${g.configured?'Cambiar archivo de conexión':'Importar conexión Google (.json)'}</label><input id="google-client" type="file" class="file-input" accept=".json,application/json"><button class="btn primary" data-action="google-connect" ${!g.configured?'disabled':''}>${g.connected?'Reconectar Google':'Conectar Google'}</button>${g.connected?`<button class="btn" data-action="google-sync" ${g.state==='syncing'?'disabled':''}>Sincronizar ahora</button><button class="btn" data-action="google-calendars">Cargar agendas</button><button class="btn" data-action="google-disconnect">Desconectar</button>`:''}${g.state==='paused'?'<button class="btn primary" data-action="google-resume">Reanudar sincronización</button>':''}</div><p class="help-text">${g.configured?'Conecta tu cuenta y elige los agendas.':'La primera conexión requiere un cliente Google de tipo Aplicación de escritorio. Consulta GOOGLE-CALENDAR.md en la carpeta de Amapola.'} La autorización queda protegida en este PC y no se incluye en las copias de datos.</p>${S.googleCalendarError?`<p class="form-error">${esc(S.googleCalendarError)}</p>`:''}${calendars.length?`<form id="google-calendars-form"><fieldset class="google-calendar-list"><legend>Agendas de Google que se reciben en Amapola</legend>${calendars.map(c=>`<label class="checkbox-field"><input type="checkbox" name="calendar" value="${esc(c.id)}" ${c.id===g.calendarId?'checked disabled':g.sourceIds===null||g.sourceIds?.includes(c.id)?'checked':''}><span>${esc(c.title)}${c.id===g.calendarId?' · Clases Amapola (siempre sincronizado)':c.primary?' · Principal':''}</span></label>`).join('')}</fieldset><button class="btn primary" type="submit">Guardar selección de agendas</button><p class="help-text">Todos los agendas accesibles están seleccionados inicialmente. Los nuevos agendas también se leen mientras no guardes una selección personalizada.</p></form>`:''}<p class="help-text">Al abrir se recibe Google durante la bienvenida, si está conectado y no está en pausa. Después, los intercambios son manuales: Actualizar recibe y Enviar aplica Amapola a Google. En Calendario puedes ocultar agendas sin dejar de recibirlos ni desactivar sus avisos de solapamiento. Sin Internet, los cambios quedan guardados localmente. Una eliminación confirmada en Google cancela la clase aquí y conserva su pago e historial. Eliminar una clase en Amapola elimina su evento en Google después de sincronizar.</p></div></section>`;
-}
-async function loadGoogleCalendars() {
-  try {S.googleCalendars=(await api('/api/google/calendars')).calendars;S.googleCalendarError='';}
-  catch(error){S.googleCalendarError=error.message;}
-  await refresh();await render();
-}
-function googleEventModal(id) {
-  const row=S.busyBlocks.find(r=>r.id===id);if(!row)return;
-  if(row.needsAssignment){googleCompleteModal(row.googleRecord);return;}
-  const link=webLink(row.googleUrl);
-  modal('Busy · Google Calendar',esc(row.title),`<p class="small-text"><strong>Agenda Google: ${esc(row.calendarName)}</strong> · ${fmtDate(row.date)} · ${row.time} – ${end(row)}</p><p class="help-text">Este evento se modifica desde Google Calendar. Pulsa Actualizar para recuperar los últimos cambios.</p>`,cancelBtn+(link?`<a class="btn primary" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Abrir Google Calendar</a>`:''),async()=>{});
-}
-function googleCompleteModal(id) {
-  const row=S.google?.inbox?.find(r=>r.id===id);if(!row)return;
-  const active=S.students.filter(s=>s.active&&s.stage!=='prospect');
-  if(!active.length){modal('Completar clase Google','Primero añade o activa un alumno.','<p>La clase seguirá pendiente; no se perderá.</p>',cancelBtn+'<button class="btn primary" type="button" data-action="new-student">Nuevo alumno</button>',async()=>{});return;}
-  modal('Completar clase de Google','Sesión puntual · Sin planificación recurrente',`<div class="field-grid">${selectField('studentId','Alumno *',active[0].id,active.map(s=>[s.id,fullname(s)]),'required')}${inputField('title','Título',row.title,'text','required maxlength="150"')}${inputField('date','Fecha',row.date||S.today,'date','required min="2000-01-01" max="2100-12-31"')}${inputField('time','Hora',row.time||'09:00','time','required step="900"')}${inputField('duration','Duración (minutos)',row.duration||60,'number','required min="15" max="720" step="15"')}${inputField('price','Tarifa',priceInput(0),'text','required inputmode="decimal"')}${selectField('modality','Modalidad','online',Object.entries(modalityNames))}${textField('notes','Notas','','maxlength="4000"')}</div>${row.foreign?'<div class="notice warning">El evento original pertenece a otro agenda y se conserva allí. Se creará un evento vinculado en el agenda Amapola; en Google verás ambos. Puedes crear los próximos cursos directamente en el agenda Amapola.</div>':''}<p class="help-text">Asocia el alumno y comprueba el horario en intervalos de 15 minutos. El pago se registra después desde Amapola.</p>`,cancelBtn+submitBtn('Crear y vincular clase'),async form=>{const v=formData(form);v.duration=Number(v.duration);v.price=parsePrice(v.price);validateSlot(v);await api('/api/google/inbox/'+encodeURIComponent(id),'POST',v);$('#dialog').close();await refresh();await render();toast('Clase asociada. Pulsa Enviar para mandar sus datos a Google.');});
-}
-function renderCalendar(rows,report,blocks=[]) {
-  S.rows=rows;S.busyBlocks=blocks;
-  const events=[...rows,...blocks].filter(calendarRowVisible).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  return '<div class="calendar-page">'+heading('TU TIEMPO, CON INTENCIÓN','Calendario','Crea y organiza tus clases en intervalos de 15 minutos.',`<div class="button-row"><button class="btn busy-button" data-action="new-busy">${icon('clock')} Ocupada</button>${newClass()}</div>`)+summary(report)+googleInboxPanel()+`<section class="panel calendar-panel"><div class="panel-header calendar-toolbar">${weekControls()}<div class="calendar-tools">${calendarSyncControls()}${calendarVisibilityControls()}</div><div class="view-toggle" aria-label="Vista del calendario"><button class="${S.calendarMode==='week'?'active':''}" aria-pressed="${S.calendarMode==='week'}" data-action="calendar-week">${icon('calendar')} Semana</button><button class="${S.calendarMode==='agenda'?'active':''}" aria-pressed="${S.calendarMode==='agenda'}" data-action="calendar-agenda">${icon('plan')} Agenda</button></div></div>${S.calendarMode==='week'?calendarGrid(events):agenda(events)}${legend(events)}<div class="payment-legend"><span><span class="payment-dot paid">$</span> Pagada</span><span><span class="payment-dot overdue">$</span> Vencida sin pagar</span><span><span class="payment-dot pending">$</span> Pendiente / sin cobro</span></div></section><p class="calendar-mobile-hint">Desliza horizontalmente para ver todos los días. También puedes usar la vista Agenda.</p><p class="inline-help">${icon('info')} Pulsa o arrastra un espacio vacío para crear una clase o marcarte ocupada. Arrastra los bloques para moverlos y sus bordes para ajustar su duración. Los bloqueos grises son recordatorios de indisponibilidad y no generan ingresos.</p></div>`;
-}
-function renderStudents() {
-  return heading('PERSONAS QUE APRENDEN CONTIGO','Alumnos','Alumnos y contactos con los que estás conversando, en un mismo lugar.',`<button class="btn primary" data-action="new-student">${icon('plus')} Nuevo alumno</button>`)+`<div class="tabs student-status-tabs">${[['all','Todos'],['active','Activos'],['prospect','En conversación'],['inactive','Inactivos']].map(([key,label])=>`<button class="tab ${S.active===key?'active':''}" data-action="student-filter" data-status="${key}">${label} <span class="muted">(${S.students.filter(s=>key==='all'||studentStatus(s)===key).length})</span></button>`).join('')}</div><section class="panel"><div class="toolbar"><div class="search">${icon('search')}<input id="student-search" aria-label="Buscar alumnos" placeholder="Buscar por nombre, correo o teléfono…" value="${esc(S.search)}"></div><div class="button-row"><select id="student-channel" class="filter-select" aria-label="Filtrar por canal"><option value="all">Todos los canales</option>${Object.entries(channelNames).map(([v,l])=>`<option value="${v}" ${S.channel===v?'selected':''}>${l}</option>`).join('')}</select><select id="student-active" class="filter-select" aria-label="Filtrar por estado"><option value="all">Todos los alumnos</option><option value="active" ${S.active==='active'?'selected':''}>Activos</option><option value="prospect" ${S.active==='prospect'?'selected':''}>En conversación</option><option value="inactive" ${S.active==='inactive'?'selected':''}>Inactivos</option></select></div></div><div id="students-table"></div></section><p class="inline-help">Cada alumno tiene su propio color. Lo reconocerás también en el calendario.</p>`;
-}
-function fillStudentTable() {
-  const q=S.search.trim().toLocaleLowerCase('es');
-  const rows=S.students.filter(s=>(!q||[s.firstName,s.lastName,s.email,s.phone,s.messenger,s.notes].join(' ').toLocaleLowerCase('es').includes(q))&&(S.channel==='all'||s.channel===S.channel)&&(S.active==='all'||studentStatus(s)===S.active)).sort((a,b)=>fullname(a).localeCompare(fullname(b),'es'));
-  const target=$('#students-table');if(!target)return;
-  target.innerHTML=rows.length?`<div class="table-scroll"><table><thead><tr><th>Alumno</th><th>Contacto</th><th>Canal preferido</th><th>Planificación</th><th>Estado</th><th><span class="muted">Acciones</span></th></tr></thead><tbody>${rows.map(s=>`<tr><td><a href="#alumnos/${s.id}" class="student-cell">${avatar(s)}<div><div class="student-name">${esc(fullname(s))}</div><div class="student-secondary">Ver ficha del alumno</div></div></a></td><td>${esc(s.phone||'—')}<div class="student-secondary">${esc(s.email)}</div>${contactLinks(s)}</td><td>${channelBadge(s)}</td><td>${S.schedules.filter(p=>p.studentId===s.id&&p.active&&(!p.endDate||p.endDate>=S.today)&&(p.recurrence!=='once'||p.startDate>=S.today)).length} horarios</td><td>${studentBadge(s)}</td><td><button class="icon-button" data-action="edit-student" data-id="${s.id}" aria-label="Editar ${esc(fullname(s))}">${icon('edit')}</button></td></tr>`).join('')}</tbody></table></div>`:empty(S.students.length?'No hay coincidencias':'Aquí empieza cada nueva historia',S.students.length?'Prueba otra búsqueda o cambia los filtros.':'Crea la ficha de tu primer alumno y elige un color para identificar sus clases.',`<button class="btn primary" data-action="new-student">${icon('plus')} Nuevo alumno</button>`);
-}
-function scheduleTable(rows) {
-  if(!rows.length)return empty('Todavía no hay horarios','Planifica una clase puntual o un horario que se repita cada semana.');
-  return `<div class="table-scroll"><table><thead><tr><th>Clase / alumno</th><th>Día y horario</th><th>Repetición</th><th>Modalidad</th><th>Tarifa / sesión</th><th></th></tr></thead><tbody>${rows.map(p=>{const s=studentBy(p.studentId);return `<tr><td><div class="student-cell"><span class="color-dot" style="--student:${esc(s.color)}"></span><div><div class="student-name">${esc(p.title)}</div><a class="student-secondary" href="#alumnos/${s.id}">${esc(fullname(s))}</a></div></div></td><td>${p.recurrence==='once'?fmtDate(p.startDate):days[p.weekday]}<div class="student-secondary">${p.time} – ${end(p)} · ${p.duration} min</div></td><td><span class="badge">${icon(p.recurrence!=='once'?'repeat':'calendar')}${p.recurrence==='biweekly'?'Cada dos semanas':p.recurrence==='weekly'?'Cada semana':'Una vez'}</span><div class="student-secondary">Desde ${fmtDate(p.startDate)}${p.endDate?` hasta ${fmtDate(p.endDate)}`:''}${!p.active?' · Pausada':''}</div></td><td>${modalityBadge(p)}</td><td>${money(p.price)}</td><td><div class="row-actions"><button class="icon-button" data-action="edit-schedule" data-id="${p.id}" aria-label="Editar planificación de ${esc(fullname(s))}">${icon('edit')}</button><button class="icon-button" data-action="delete-schedule" data-id="${p.id}" aria-label="Eliminar planificación de ${esc(fullname(s))}">${icon('trash')}</button></div></td></tr>`;}).join('')}</tbody></table></div>`;
-}
-function renderStudent(s,history) {
-  const plans=S.schedules.filter(p=>p.studentId===s.id).sort((a,b)=>a.weekday-b.weekday||a.time.localeCompare(b.time));
-  S.history=history;S.rows=history;
-  return `<a href="#alumnos" class="back-link">${icon('left')} Todos los alumnos</a>`+`<div class="page-heading"><div class="student-hero">${avatar(s,true)}<div><div class="eyebrow">FICHA DEL ALUMNO</div><h1>${esc(fullname(s))}</h1>${studentBadge(s)}</div></div><div class="button-row"><button class="btn" data-action="edit-student" data-id="${s.id}">${icon('edit')} Editar alumno</button><button class="icon-button" data-action="delete-student" data-id="${s.id}" aria-label="Eliminar alumno">${icon('trash')}</button></div></div><div class="detail-grid"><section class="panel"><div class="panel-header"><h2>Información de contacto</h2>${channelBadge(s)}</div><div class="panel-body">${contactLinks(s)}<div class="info-grid"><div><div class="info-label">Teléfono</div><div class="info-value">${esc(s.phone||'Sin especificar')}</div></div><div><div class="info-label">Email</div><div class="info-value">${esc(s.email||'Sin especificar')}</div></div><div><div class="info-label">Messenger</div><div class="info-value">${esc(s.messenger||'Sin especificar')}</div></div><div><div class="info-label">Color en el calendario</div><div class="legend-item"><span class="color-dot" style="--student:${esc(s.color)}"></span><span class="small-text">${esc(s.color)}</span></div></div></div></div></section><section class="panel"><div class="panel-header"><h2>Notas generales</h2>${icon('plan')}</div><div class="panel-body"><div class="notes-text">${linkedNotes(s.notes||'Añade aquí objetivos, preferencias o cualquier detalle que quieras recordar.')}</div></div></section></div><div class="tabs"><button class="tab ${S.studentTab==='planning'?'active':''}" data-action="student-planning">Planificación <span class="muted">(${plans.length})</span></button><button class="tab ${S.studentTab==='history'?'active':''}" data-action="student-history">Clases pasadas <span class="muted">(${history.length})</span></button></div>${S.studentTab==='planning'?`<section class="panel"><div class="panel-header"><div><h2>Horarios de ${esc(s.firstName)}</h2><p class="subtitle small-text">Clases puntuales y horarios recurrentes.</p></div>${s.stage==='prospect'?`<button class="btn primary" data-action="edit-student" data-id="${s.id}">Activar como alumno</button>`:newClass(s.id)}</div>${s.stage==='prospect'?'<p class="panel-body muted">Contacto en conversación. Usa sus enlaces para continuar el seguimiento. Cuando confirme las clases, cambia su estado a Activo.</p>':scheduleTable(plans)}</section>`:`<section class="panel"><div class="panel-header"><h2>Historial de clases</h2><span class="muted small-text">Las clases pasadas conservan su tarifa y horario.</span></div>${classTable(history)}</section>`}`;
-}
-function renderPlanning(rows) {
-  S.rows=rows;const visible=S.planDay===null?rows:rows.filter(r=>dayOf(r.date)===S.planDay);
-  return heading('UNA BUENA SEMANA EMPIEZA AQUÍ','Planificación','Organiza los horarios y deja que las repeticiones hagan el resto.',newClass())+`<section class="panel"><div class="panel-header"><h2>Agenda de la semana</h2>${weekControls()}</div><div class="panel-body" style="padding-bottom:0"><div class="week-summary">${days.map((d,i)=>`<button class="week-chip ${S.planDay===i?'active':''}" data-action="plan-day" data-day="${i}"><span>${shortDays[i]}</span><strong>${rows.filter(r=>dayOf(r.date)===i&&r.status!=='cancelled').length}</strong><span>clases</span></button>`).join('')}</div>${S.planDay!==null?'<button class="text-button small-text" data-action="plan-all">Mostrar toda la semana</button>':''}</div>${agenda(visible)}</section><section class="panel"><div class="panel-header"><div><h2>Todas las planificaciones</h2><p class="subtitle small-text">Edita aquí la repetición. Los cambios conservan el historial.</p></div><span class="badge">${S.schedules.length} horarios</span></div>${scheduleTable([...S.schedules].sort((a,b)=>a.weekday-b.weekday||a.time.localeCompare(b.time)))}</section>`;
-}
-function renderReports(report) {
-  const data=report[S.reportTab],max=Math.max(1,...data.students.map(s=>s.total));
-  return heading('UNA MIRADA A TU ACTIVIDAD','Informes','Una previsión sencilla de tus clases e ingresos.',weekControls())+`<div class="report-cards">${[['current','Semana seleccionada'],['next','Semana siguiente']].map(([key,label])=>{const r=report[key];return `<section class="report-card ${key==='current'?'highlight':''}"><div class="eyebrow">${label}</div><h2>${range(r.start)}</h2><div class="report-total">${money(r.total)}</div><div class="report-meta"><span>${icon('calendar')}${r.count} clases</span><span>${icon('clock')}${num(r.hours)} horas</span><span>${r.cancelled} canceladas</span></div></section>`;}).join('')}</div><div class="tabs"><button class="tab ${S.reportTab==='current'?'active':''}" data-action="report-current">Semana seleccionada</button><button class="tab ${S.reportTab==='next'?'active':''}" data-action="report-next">Semana siguiente</button></div><section class="panel"><div class="panel-header"><h2>Ingresos estimados por alumno</h2><span class="muted small-text">${range(data.start)}</span></div>${data.students.length?`<div class="table-scroll"><table><thead><tr><th>Alumno</th><th>Clases</th><th>Horas</th><th>Distribución</th><th>Total estimado</th></tr></thead><tbody>${data.students.sort((a,b)=>b.total-a.total).map(s=>`<tr><td><a class="student-cell" href="#alumnos/${s.id}">${avatar(studentBy(s.id))}<span class="student-name">${esc(s.name)}</span></a></td><td>${s.count}</td><td>${num(s.minutes/60)}</td><td><div class="bar-track"><div class="bar-fill" style="--student:${s.color};width:${s.total/max*100}%"></div></div></td><td><strong>${money(s.total)}</strong></td></tr>`).join('')}</tbody></table></div>`:empty('Todavía no hay ingresos previstos','Añade clases con su tarifa para ver aquí la previsión semanal.')}</section><div class="notice">${icon('info')}<div>Los importes son una estimación: suman la tarifa por sesión de las clases programadas y realizadas. Las canceladas no se incluyen. No representan pagos recibidos.</div></div>`;
-}
-function inputField(name,label,value='',type='text',extra='',help='') { return `<div class="field"><label for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}>${help?`<small>${help}</small>`:''}</div>`; }
-function selectField(name,label,value,options,extra='') { return `<div class="field"><label for="${name}">${label}</label><select id="${name}" name="${name}" ${extra}>${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`; }
-function textField(name,label,value='',extra='') { return `<div class="field full"><label for="${name}">${label}</label><textarea id="${name}" name="${name}" maxlength="6000" ${extra}>${esc(value)}</textarea></div>`; }
-function renderSettings(backups) {
-  const c=S.settings;
-  return heading('A TU MANERA','Mi información','Los pequeños detalles que hacen de Amapola tu espacio.',`<button class="btn primary" type="submit" form="settings-form">${icon('check')} Guardar cambios</button>`)+`<div class="settings-grid"><nav class="settings-menu" aria-label="Secciones de configuración"><a href="#info-section" data-scroll="info-section">Mi información</a><a href="#appearance-section" data-scroll="appearance-section">Apariencia</a><a href="#backup-section" data-scroll="backup-section">Copias de seguridad</a><a href="#google-section" data-scroll="google-section">Google Calendar</a></nav><div><form id="settings-form"><section class="panel settings-section" id="info-section"><div class="panel-header"><h2>Mi información</h2><span class="muted">${icon('users')}</span></div><div class="panel-body field-grid">${inputField('name','Mi nombre',c.name,'text','maxlength="200"')}${inputField('business','Nombre de mi espacio',c.business,'text','maxlength="200"')}${inputField('email','Email',c.email,'email','maxlength="254"')}${inputField('phone','Teléfono',c.phone,'tel','maxlength="60"')}${selectField('currency','Moneda',c.currency,[['COP','Peso colombiano · COP'],['EUR','Euro · EUR'],['CAD','Dólar canadiense · CAD'],['USD','Dólar estadounidense · USD'],['MXN','Peso mexicano · MXN'],['GBP','Libra esterlina · GBP']])}${inputField('timezone','Zona horaria',c.timezone,'text','required list="timezones"','Define el día actual y el comienzo del historial.')}<datalist id="timezones"><option value="America/Bogota"><option value="America/New_York"><option value="America/Toronto"><option value="Europe/Paris"><option value="Europe/Madrid"><option value="America/Mexico_City"></datalist>${textField('notes','Notas personales',c.notes)}<div class="field full"><small>La moneda se aplica a toda la aplicación. Cambiarla no convierte las tarifas existentes.</small></div></div></section><section class="panel settings-section" id="appearance-section"><div class="panel-header"><h2>Apariencia</h2>${icon('sun')}</div><div class="panel-body"><p class="subtitle" style="margin-bottom:17px">Elige cómo quieres ver tu espacio.</p><div class="theme-options">${[['light','sun','Claro'],['dark','moon','Oscuro'],['system','system','Sistema']].map(([v,ico,label])=>`<button type="button" class="theme-option ${theme===v?'active':''}" data-theme-choice="${v}">${icon(ico)}${label}</button>`).join('')}</div><p class="help-text">Esta preferencia se guarda en este navegador.</p></div></section><section class="panel settings-section" id="backup-section"><div class="panel-header"><div><h2>Copias de seguridad</h2><p class="subtitle small-text">Tus clases merecen estar bien guardadas.</p></div>${icon('cloud')}</div><div class="panel-body"><div class="notice">${icon('info')}<div>Se crean copias locales automáticamente después de los cambios. Conserva también una copia fuera de este ordenador.</div></div>${backups.error?`<div class="notice warning">${esc(backups.error)}</div>`:''}<div class="field-grid">${selectField('backupMode','Destino de la copia manual',c.backupMode,[['download','Descarga / copia local'],['folder','Carpeta sincronizada de kDrive'],['api','Envío directo a kDrive (API)']])}<div></div><div class="field full backup-folder ${c.backupMode==='folder'?'':'hide'}"><label for="backupFolder">Ruta completa de la carpeta sincronizada</label><input id="backupFolder" name="backupFolder" value="${esc(c.backupFolder)}" placeholder="C:\Usuarios\…\kDrive\Amapola"><small>La carpeta debe existir. Amapola confirma la copia local; verifica después la sincronización en kDrive.</small></div><div class="field backup-api ${c.backupMode==='api'?'':'hide'}"><label for="driveId">Identificador de kDrive</label><input id="driveId" name="driveId" inputmode="numeric" value="${esc(c.driveId)}" placeholder="123456"><small>El número que aparece después de /drive/ en kDrive.</small></div><div class="field backup-api ${c.backupMode==='api'?'':'hide'}"><label for="driveFolder">Carpeta en el espacio privado</label><input id="driveFolder" name="driveFolder" value="${esc(c.driveFolder)}" placeholder="Amapola/Copias"><small>Se crea si no existe. Sin barra inicial.</small></div></div><p class="help-text">Elige el destino y pulsa Guardar cambios antes de crear la copia. No necesitas cambiar ninguna fecha ni editar una clase.</p><div class="form-error" id="settings-error" role="alert"></div></div></section></form><section class="panel"><div class="panel-header"><h2>Crear o recuperar una copia</h2></div><div class="panel-body"><div class="field ${c.backupMode==='api'?'':'hide'}"><label for="api-token">Token API de Infomaniak</label><input id="api-token" type="password" autocomplete="off" placeholder="Se utiliza una sola vez y no se guarda"><small>Crea un token con permiso de escritura en kDrive. No introduzcas tu contraseña de cuenta.</small></div><div class="backup-actions"><button class="btn primary" data-action="backup-send">${icon(c.backupMode==='download'?'download':'cloud')}${c.backupMode==='download'?'Descargar copia':c.backupMode==='api'?'Enviar a kDrive':'Copiar a carpeta kDrive'}</button>${c.backupMode!=='download'?`<button class="btn" data-action="backup-local">${icon('download')} Descargar copia local</button>`:''}<label for="restore-file" class="btn file-label">${icon('repeat')} Restaurar una copia</label><input id="restore-file" type="file" accept=".amapola" class="file-input"></div><ol class="backup-instructions"><li>Para guardar: configura el destino y pulsa <strong>Descargar copia</strong>. Conserva el archivo .amapola también en un USB u otro lugar fuera de este PC.</li><li>Para otro PC: extrae la aplicación, abre Amapola y usa <strong>Restaurar una copia</strong>. Selecciona el archivo .amapola y escribe RESTAURAR. Se reemplazarán los datos de ese PC.</li></ol><p class="small-text muted">Las copias incluyen alumnos, contactos en conversación, notas y enlaces, planificaciones, historial, estados de clase, pagos y métodos, sesiones eliminadas, bloques Ocupada y configuración. No tienen contraseña propia: guárdalas en un lugar privado. El token API no se incluye.</p><div class="info-label" style="margin-top:22px">Datos en este ordenador</div><div class="storage-path">${esc(S.dataDir)}</div></div><div class="panel-header" style="border-top:1px solid var(--line)"><h3>Copias locales recientes</h3><span class="small-text muted">${backups.files.length} disponibles</span></div>${backups.files.length?`<div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Tamaño</th><th></th></tr></thead><tbody>${backups.files.slice(0,10).map(b=>`<tr><td>${esc(new Date(b.modifiedAt).toLocaleString('es-CO'))}</td><td><span class="badge">${b.filename.includes('-auto-')?'Automática':b.filename.includes('-antes-de-')?'Antes de un cambio':'Manual'}</span></td><td>${num(b.size/1024)} KB</td><td><a class="text-button" href="/api/backups/file/${encodeURIComponent(b.filename)}" download>Descargar</a></td></tr>`).join('')}</tbody></table></div>`:'<div class="panel-body small-text muted">Las primeras copias aparecerán después de guardar tus datos.</div>'}</section></div></div>`;
-}
 async function render() {
   const ticket=++S.renderId, hash=location.hash.slice(1)||'calendario', [page,id]=hash.split('/');
   const names={calendario:'Calendario',alumnos:'Alumnos',clases:'Clases',planificacion:'Planificación',informes:'Informes',ajustes:'Mi información'};
@@ -432,176 +144,142 @@ async function render() {
     }
   } catch(e){if(ticket===S.renderId){disposeCalendar();$('#main').innerHTML=empty('No se pudo abrir esta vista',esc(e.message),page==='clases'?'<button class="btn" data-action="class-clear">Restablecer filtros</button>':'<button class="btn" data-action="retry">Reintentar</button>');toast(e.message,true);}}
 }
-function modal(title,subtitle,body,footer,submit) {
-  const dialog=$('#dialog');
-  $('#dialog-content').innerHTML=`<form id="modal-form"><div class="dialog-header"><div><h2 id="dialog-title">${title}</h2><p>${subtitle}</p></div><button type="button" class="icon-button" data-action="close-dialog" aria-label="Cerrar">${icon('close')}</button></div><div class="dialog-body">${body}<div id="modal-error" class="form-error" role="alert"></div></div><div class="dialog-footer">${footer}</div></form>`;
-  dialog.setAttribute('aria-labelledby','dialog-title');
-  $('#modal-form').addEventListener('submit',async ev=>{ev.preventDefault();const button=$('#modal-form button[type=submit]');if(button)button.disabled=true;$('#modal-error').textContent='';try{await submit(ev.target);}catch(e){if($('#modal-error'))$('#modal-error').textContent=e.message;else toast(e.message,true);}finally{if(button)button.disabled=false;}});
-  if(!dialog.open)dialog.showModal();
-}
+
 const cancelBtn='<button class="btn" type="button" data-action="close-dialog">Cancelar</button>';
 const submitBtn=label=>`<button type="submit" class="btn primary">${label}</button>`;
 const formData=form=>Object.fromEntries(new FormData(form));
-function conflictMarkup(result, accepted=false) {
-  if(!result.total)return `<p class="overlap-clear">${icon('check')} Sin solapamientos${result.recurring?' en la planificación':''}.</p>`;
-  return `<div class="overlap-notice"><strong>${icon('info')} Cuidado: este horario coincide con ${result.total} ${result.total===1?'actividad':'actividades'}.</strong><ul>${result.conflicts.map(r=>`<li><strong>${esc(r.kind==='busy'?`Ocupada: ${r.title}`:`Clase con ${r.studentName}`)}</strong><span>${fmtDate(r.date,{day:'numeric',month:'short',year:'numeric'})} · ${r.time} - ${end(r)}${r.kind==='busy'?'':` · ${esc(r.title)}`}</span></li>`).join('')}</ul>${result.total>result.conflicts.length?`<p>Se muestran las primeras ${result.conflicts.length} coincidencias.</p>`:''}${result.recurring?'<p>Se comprueban todas las repeticiones de la planificación.</p>':''}<label class="checkbox-field"><input type="checkbox" name="overlapAccepted" ${accepted?'checked':''}>Quiero guardar aunque haya solapamientos.</label></div>`;
-}
-function setupConflicts(kind,id,readValue) {
-  const form=$('#modal-form');if(!form?.elements)return;
-  const region=document.createElement('div');region.className='overlap-region';region.setAttribute('role','status');region.setAttribute('aria-live','polite');
-  $('#modal-error').before(region);
-  let timer, serial=0, lastKey='', lastSignature='';
-  async function check(force=false) {
-    const value=readValue(form),key=JSON.stringify(value);
-    const accepted=!!form.elements.overlapAccepted?.checked&&key===lastKey;
-    const ticket=++serial;
-    const result=await api('/api/conflicts','POST',{kind,id,value});
-    if(ticket!==serial||!form.isConnected)return false;
-    const signature=JSON.stringify(result);
-    const confirmed=accepted&&lastSignature===signature;
-    lastKey=key;lastSignature=signature;
-    region.innerHTML=conflictMarkup(result,confirmed);
-    if(force&&result.total&&!confirmed)throw new Error('Revisa las coincidencias y marca la confirmación para guardar este horario.');
-    return true;
-  }
-  form.checkConflicts=()=>{clearTimeout(timer);return check(true);};
-  const changed=ev=>{
-    if(ev?.target?.name==='overlapAccepted')return;
-    clearTimeout(timer);serial++;lastKey='';
-    region.textContent='Comprobando disponibilidad…';
-    timer=setTimeout(async()=>{
-      if(!form.isConnected)return;
-      try{if(!form.checkValidity()){region.textContent='Completa la fecha y el horario para comprobar la disponibilidad.';return;}await check();}
-      catch(error){if(form.isConnected)region.textContent=error.message;}
-    },250);
-  };
-  form.addEventListener('input',changed);form.addEventListener('change',changed);changed();
-}
-async function confirmConflicts(form) {
-  if(!form.checkConflicts||!await form.checkConflicts())throw new Error('El horario cambió durante la comprobación. Revisa los datos y vuelve a guardar.');
-}
-function scheduleDraft(form,p,id) {
-  const v=formData(form);v.studentId=id?p.studentId:form.elements.studentId.value;
-  v.duration=Number(v.duration);v.weekday=Number(v.weekday);v.price=parsePrice(v.price);validateSlot(v);v.active=id?form.elements.active.checked:true;
-  if(v.recurrence==='once'){v.weekday=dayOf(v.startDate);v.endDate='';}
-  delete v.overlapAccepted;return v;
-}
-function sessionDraft(form,row) { const v=formData(form);v.studentId=row.studentId;v.duration=Number(v.duration);v.price=parsePrice(v.price);validateSlot(v);delete v.overlapAccepted;return v; }
-function busyDraft(form) { const v=formData(form);v.duration=Number(v.duration);validateSlot(v);delete v.overlapAccepted;return v; }
-function studentModal(id) {
-  const s=id?studentBy(id):{firstName:'',lastName:'',channel:'whatsapp',phone:'',email:'',messenger:'',notes:'',color:palette[S.students.length%palette.length],active:1,stage:S.active==='prospect'?'prospect':'student'};
-  modal(id?'Editar alumno':'Un nuevo alumno','Guarda también los contactos que todavía están decidiendo si tomar clases.',`<div class="field-grid">${inputField('firstName','Nombre *',s.firstName,'text','required maxlength="100" autocomplete="given-name"')}${inputField('lastName','Apellidos',s.lastName,'text','maxlength="150" autocomplete="family-name"')}${selectField('channel','Canal de comunicación preferido',s.channel,Object.entries(channelNames))}${inputField('phone','Teléfono / WhatsApp',s.phone,'tel','maxlength="60" autocomplete="tel"','Para abrir WhatsApp, incluye + y el código de país (por ejemplo +57).')}${inputField('email','Email',s.email,'email','maxlength="254" autocomplete="email"')}${inputField('messenger','Nombre o enlace de Messenger',s.messenger,'text','maxlength="200"')}${selectField('studentState','Estado de seguimiento',studentStatus(s),Object.entries(studentStatusNames))}${textField('notes','Notas y enlaces de seguimiento',s.notes)}<div class="field full"><label for="color">Color en el calendario</label><div class="color-choices">${palette.map(c=>`<button type="button" class="color-choice ${s.color===c?'selected':''}" data-color="${c}" style="--student:${c}" aria-label="Elegir color ${c}"></button>`).join('')}<input type="color" id="color" name="color" value="${s.color}" aria-label="Color personalizado"></div></div></div><p class="help-text">En conversación: contacto potencial pendiente de seguimiento. Activo: alumno que toma clases. Inactivo: alumno que ya no toma clases. Solo los activos muestran futuras clases recurrentes; el historial se conserva. Pega enlaces completos de Messenger, Instagram u otros chats; los enlaces de las notas se pueden abrir desde la ficha.</p>`,cancelBtn+submitBtn(id?'Guardar cambios':'Crear alumno'),async form=>{
-    const v=formData(form);v.stage=v.studentState==='prospect'?'prospect':'student';v.active=v.studentState==='active';delete v.studentState;
-    const row=await api(id?`/api/students/${id}`:'/api/students',id?'PUT':'POST',v);$('#dialog').close();await refresh();if(!id){S.studentTab='planning';location.hash=`alumnos/${row.id}`;}await render();toast(row.stage==='prospect'?'Contacto guardado en En conversación.':id?'Alumno actualizado.':'Alumno creado. Ahora puedes planificar sus clases.');
-  });
-  $$('[data-color]',$('#dialog')).forEach(b=>b.addEventListener('click',()=>{$('#color').value=b.dataset.color;$$('[data-color]').forEach(c=>c.classList.toggle('selected',c===b));}));
-  $('#color').addEventListener('input',()=>$$('[data-color]').forEach(c=>c.classList.toggle('selected',c.dataset.color===$('#color').value)));
-}
-function scheduleModal(id,studentId,seed={}) {
-  const active=S.students.filter(s=>s.active);
-  if(!active.length&&!id){toast('Primero crea o activa un alumno.');studentModal();return;}
-  const p=id?S.schedules.find(s=>s.id===id):{studentId:studentId||active[0]?.id,title:'Clase particular',weekday:dayOf(seed.date||S.today),time:seed.time||'09:00',duration:seed.duration||60,price:0,modality:'online',recurrence:'weekly',startDate:seed.date||S.today,endDate:'',notes:'',active:1};
-  if(!p)return;
-  const anchor=plusDays(p.startDate,(p.weekday-dayOf(p.startDate)+7)%7);
-  const nextFortnight=plusDays(anchor,Math.max(0,Math.ceil((Date.parse(S.today)-Date.parse(anchor))/86400000/14))*14);
-  const start=id&&p.startDate<S.today?(p.recurrence==='biweekly'?nextFortnight:S.today):p.startDate;
-  modal(id?'Editar planificación':'Planificar una clase',id?'Se conservan las clases pasadas y las sesiones modificadas individualmente.':'Un horario claro, una semana más ligera.',`<div class="field-grid">${selectField('studentId','Alumno *',p.studentId,(id?S.students:active).map(s=>[s.id,fullname(s)]),id?'disabled':'required')}${inputField('title','Nombre de la clase *',p.title,'text','required maxlength="150"')}${selectField('recurrence','Repetición',p.recurrence,[['weekly','Cada semana'],['biweekly','Cada dos semanas'],['once','No repetir · una sola sesión']])}${selectField('weekday','Día de la semana',p.weekday,days.map((d,i)=>[i,d]))}${inputField('startDate',id?'Aplicar a partir del *':'Fecha de inicio *',start,'date',`required ${id?`min="${S.today}"`:''} max="2100-12-31"`)}${inputField('endDate','Fecha de fin (opcional)',p.endDate,'date','max="2100-12-31"')}${inputField('time','Hora de inicio *',p.time,'time','required step="900"')}${inputField('duration','Duración en minutos *',p.duration,'number','required min="15" max="720" step="15"')}${inputField('price',`Tarifa por sesión (${S.settings.currency}) *`,priceInput(p.price),'text','required inputmode="decimal"','Importe total de la clase; no es una tarifa por hora.')}${selectField('modality','Modalidad',p.modality,[['online','En línea · ordenador'],['home','Presencial · en mi espacio'],['travel','A domicilio · me desplazo']])}${textField('notes','Notas de la planificación',p.notes,'maxlength="4000"')}${id?`<label class="checkbox-field"><input type="checkbox" name="active" ${p.active?'checked':''}>Planificación activa</label>`:''}</div><p class="help-text">La primera clase será el día elegido a partir de la fecha de inicio. Cada dos semanas mantiene intervalos de 14 días desde esa primera clase.</p>`,cancelBtn+submitBtn(id?'Guardar planificación':'Crear planificación'),async form=>{
-    const v=scheduleDraft(form,p,id);
-    await confirmConflicts(form);
-    await api(id?`/api/schedules/${id}`:'/api/schedules',id?'PUT':'POST',v);$('#dialog').close();await refresh();await render();toast('Planificación guardada.');
-  });
-  const toggle=()=>{const once=$('#recurrence').value==='once';$('#weekday').disabled=once;$('#endDate').disabled=once;};$('#recurrence').addEventListener('change',toggle);toggle();
-  setupConflicts('schedule',id,form=>scheduleDraft(form,p,id));
-}
-function sessionModal(id) {
-  const r=findSession(id);if(!r)return;
-  modal('Detalles de la clase',esc(r.studentName||fullname(studentBy(r.studentId))),`${googleClassOrigin(r)}<div class="field-grid">${inputField('title','Nombre de la clase',r.title,'text','required maxlength="150"')}${selectField('status','Estado de clase',r.status,Object.entries(classStatusNames))}${inputField('date','Fecha',r.date,'date','required min="2000-01-01" max="2100-12-31"')}${inputField('time','Hora de inicio',r.time,'time','required step="900"')}${inputField('duration','Duración (minutos, de 15 en 15)',r.duration,'number','required min="15" max="720" step="15"')}${inputField('price',`Tarifa de esta sesión (${S.settings.currency})`,priceInput(r.price),'text','required inputmode="decimal"')}${selectField('modality','Modalidad',r.modality,Object.entries(modalityNames))}<div></div>${selectField('paymentStatus','Estado de pago',r.paymentStatus||'unpaid',[['unpaid','Sin pagar'],['paid','Pagada']])}${selectField('paymentMethod','Método de pago',r.paymentMethod||'',Object.entries(paymentMethodNames))}${textField('notes','Notas de la sesión',r.notes,'maxlength="4000"')}</div><p class="help-text">Si cambias el horario, la duración o los detalles, podrás elegir el alcance antes de guardar. El pago y el estado de clase se registran siempre por sesión. El precio no se recalcula al cambiar la duración.</p>`,`<button type="button" class="btn danger" data-action="delete-session" data-id="${esc(id)}">${icon('trash')} Eliminar esta sesión</button>`+cancelBtn+submitBtn('Guardar cambios'),async form=>{
-    const v=sessionDraft(form,r);
-    if(v.paymentStatus==='paid'&&!v.paymentMethod)throw new Error('Selecciona el método de pago.');
-    const changed=['title','date','time','duration','price','modality','notes'].some(key=>v[key]!==r[key]);
-    if(changed){chooseScope(r,v);return;}
-    await confirmConflicts(form);
-    await api(`/api/sessions/${encodeURIComponent(id)}`,'PUT',v);$('#dialog').close();await refresh();await render();toast('Clase actualizada.');
-  });
-  setupConflicts('session',id,form=>sessionDraft(form,r));
-}
-function chooseScope(row,draft) {
-  const rule=S.schedules.find(s=>s.id===row.scheduleId),clock=classClock();
-  const started=row.date<clock.today||(row.date===clock.today&&row.time<clock.time);
-  const targetPast=draft.date<clock.today||(draft.date===clock.today&&draft.time<clock.time);
-  const following=rule?.active&&['weekly','biweekly'].includes(rule.recurrence)&&row.originalDate>=clock.today&&!started&&!targetPast;
-  modal('¿A qué clases se aplica el cambio?',esc(row.studentName||fullname(studentBy(row.studentId))),`<div class="change-summary"><strong>${fmtDate(draft.date,{weekday:'long',day:'numeric',month:'long'})}</strong><span>${draft.time} – ${end(draft)} · ${draft.duration} minutos</span></div><fieldset class="scope-choices"><legend>Aplicar el cambio a</legend><label><input type="radio" name="scope" value="session" checked><span><strong>Solo esta sesión</strong><small>Las demás clases mantienen su planificación.</small></span></label><label class="${following?'':'unavailable'}"><input type="radio" name="scope" value="following" ${following?'':'disabled'}><span><strong>Esta y las siguientes de la planificación</strong><small>${following?'Se actualiza el horario de la planificación a partir de esta clase. El historial y las excepciones individuales se conservan.':'Disponible para clases recurrentes que todavía no han comenzado y no se mueven al pasado.'}</small></span></label></fieldset><p class="help-text">El importe por sesión se conserva al mover o ajustar la duración. Los pagos existentes se mantienen y nunca se aplican automáticamente a otras clases.</p>`,cancelBtn+submitBtn('Confirmar cambio'),async form=>{
-    validateSlot(draft);
-    await confirmConflicts(form);
-    await api(`/api/sessions/${encodeURIComponent(row.id)}/change`,'PUT',{...draft,scope:form.elements.scope.value});
-    $('#dialog').close();await refresh();await render();toast('Cambio guardado.');
-  });
-  setupConflicts('session',row.id,form=>({...draft,scope:form.elements.scope.value}));
-}
-function paymentModal(id) {
-  const row=findSession(id);if(!row)return;
-  modal('Registrar pago',`${esc(row.studentName||fullname(studentBy(row.studentId)))} · ${fmtDate(row.date)} · ${row.time}`,`<p class="payment-amount">${money(row.price)}</p><div class="field-grid">${selectField('paymentStatus','Estado de pago',row.paymentStatus||'unpaid',[['unpaid','Sin pagar'],['paid','Pagada']])}${selectField('paymentMethod','Método de pago',row.paymentMethod||'',Object.entries(paymentMethodNames))}</div><p class="help-text">Este pago corresponde únicamente a esta sesión. También puedes registrar un pago anticipado de una clase futura.</p>`,cancelBtn+submitBtn('Guardar pago'),async form=>{
-    const v=formData(form);if(v.paymentStatus==='paid'&&!v.paymentMethod)throw new Error('Selecciona el método de pago.');
-    await api(`/api/sessions/${encodeURIComponent(id)}/payment`,'PUT',v);$('#dialog').close();await refresh();await render();toast('Pago actualizado.');
-  });
-}
 
-function calendarCreateModal(seed) {
-  S.calendarSeed=seed;
-  modal('¿Qué quieres añadir?',`${fmtDate(seed.date,{weekday:'long',day:'numeric',month:'long'})} · ${seed.time} – ${end(seed)}`,`<div class="calendar-create-choices"><button type="button" class="create-choice" data-action="calendar-create-class">${icon('calendar')}<strong>Clase</strong><span>Una sesión o una planificación semanal con un alumno.</span></button><button type="button" class="create-choice busy-choice" data-action="calendar-create-busy">${icon('clock')}<strong>Ocupada</strong><span>Reservar este horario para una pausa, una cita o un compromiso personal.</span></button></div>`,cancelBtn,async()=>{});
-}
-function busyModal(id,seed={}) {
-  const old=id?S.busyBlocks.find(b=>b.id===id):{title:'Ocupada',date:S.today,time:'09:00',duration:60,notes:''};
-  if(!old)return;
-  const b={...old,...seed};
-  modal(id?'Editar bloqueo de disponibilidad':'Marcar como ocupada','Este bloque es un recordatorio; no tiene alumno, tarifa ni pago.',`<div class="field-grid">${inputField('title','Título',b.title,'text','required maxlength="150"')}${inputField('date','Fecha',b.date,'date','required min="2000-01-01" max="2100-12-31"')}${inputField('time','Hora de inicio',b.time,'time','required step="900"')}${inputField('duration','Duración (minutos)',b.duration,'number','required min="15" max="720" step="15"')}${textField('notes','Notas',b.notes,'maxlength="4000"')}</div><p class="help-text">Se muestra en gris claro en las vistas Semana y Agenda. Puedes moverlo y ajustar su duración desde el calendario.</p>`,(id?`<button type="button" class="btn danger" data-action="delete-busy" data-id="${id}">${icon('trash')} Eliminar</button>`:'')+cancelBtn+submitBtn('Guardar bloqueo'),async form=>{
-    const v=busyDraft(form);
-    await confirmConflicts(form);
-    await api(id?`/api/busy-blocks/${encodeURIComponent(id)}`:'/api/busy-blocks',id?'PUT':'POST',v);
-    $('#dialog').close();await refresh();await render();toast('Bloque de disponibilidad guardado.');
-  });
-  setupConflicts('busy',id,busyDraft);
-}
-function deleteBusy(id) {
-  confirmAction('¿Eliminar este bloqueo?','Se eliminará este recordatorio de indisponibilidad. Se crea antes una copia de seguridad.','Eliminar bloqueo',async()=>{
-    await api(`/api/busy-blocks/${encodeURIComponent(id)}`,'DELETE',{confirm:true});await refresh();await render();toast('Bloque eliminado.');
-  },true);
-}
+// One shared state, with late-bound actions to avoid circular imports.
+let closeGuard;
+const uiContext = {
+  get theme() { return theme; },
+  get closeGuard() { return closeGuard; },
+  get $() { return $; },
+  get $$() { return $$; },
+  get S() { return S; },
+  get agenda() { return agenda; },
+  get api() { return api; },
+  get avatar() { return avatar; },
+  get busyDraft() { return busyDraft; },
+  get busyModal() { return busyModal; },
+  get calendarConnectionWarning() { return calendarConnectionWarning; },
+  get calendarCreateModal() { return calendarCreateModal; },
+  get calendarGrid() { return calendarGrid; },
+  get calendarRowVisible() { return calendarRowVisible; },
+  get calendarScale() { return calendarScale; },
+  get calendarSyncControls() { return calendarSyncControls; },
+  get calendarVisibilityControls() { return calendarVisibilityControls; },
+  get cancelBtn() { return cancelBtn; },
+  get channelBadge() { return channelBadge; },
+  get channelNames() { return channelNames; },
+  get checkCalendarEntry() { return checkCalendarEntry; },
+  get chooseScope() { return chooseScope; },
+  get classClock() { return classClock; },
+  get classStatusNames() { return classStatusNames; },
+  get classStatusPill() { return classStatusPill; },
+  get classTable() { return classTable; },
+  get confirmAction() { return confirmAction; },
+  get confirmConflicts() { return confirmConflicts; },
+  get conflictMarkup() { return conflictMarkup; },
+  get contactLinks() { return contactLinks; },
+  get createBackup() { return createBackup; },
+  get cycleClassStatus() { return cycleClassStatus; },
+  get dayOf() { return dayOf; },
+  get days() { return days; },
+  get deleteBusy() { return deleteBusy; },
+  get deleteSchedule() { return deleteSchedule; },
+  get deleteSession() { return deleteSession; },
+  get deleteStudent() { return deleteStudent; },
+  get disposeCalendar() { return disposeCalendar; },
+  get download() { return download; },
+  get empty() { return empty; },
+  get end() { return end; },
+  get esc() { return esc; },
+  get fillStudentTable() { return fillStudentTable; },
+  get findSession() { return findSession; },
+  get fmtDate() { return fmtDate; },
+  get formData() { return formData; },
+  get fullname() { return fullname; },
+  get googleClassOrigin() { return googleClassOrigin; },
+  get googleCompleteModal() { return googleCompleteModal; },
+  get googleEventModal() { return googleEventModal; },
+  get googleInboxPanel() { return googleInboxPanel; },
+  get googleSettings() { return googleSettings; },
+  get googleSyncStatus() { return googleSyncStatus; },
+  get heading() { return heading; },
+  get icon() { return icon; },
+  get inputField() { return inputField; },
+  get layoutEvents() { return layoutEvents; },
+  get legend() { return legend; },
+  get linkedNotes() { return linkedNotes; },
+  get loadGoogleCalendars() { return loadGoogleCalendars; },
+  get min() { return min; },
+  get modal() { return modal; },
+  get modalityBadge() { return modalityBadge; },
+  get modalityIcon() { return modalityIcon; },
+  get modalityNames() { return modalityNames; },
+  get money() { return money; },
+  get newClass() { return newClass; },
+  get nextClassStatus() { return nextClassStatus; },
+  get noteLinks() { return noteLinks; },
+  get num() { return num; },
+  get openApplication() { return openApplication; },
+  get palette() { return palette; },
+  get parsePrice() { return parsePrice; },
+  get paymentLabels() { return paymentLabels; },
+  get paymentMethodNames() { return paymentMethodNames; },
+  get paymentModal() { return paymentModal; },
+  get paymentPill() { return paymentPill; },
+  get paymentState() { return paymentState; },
+  get plusDays() { return plusDays; },
+  get previewRestore() { return previewRestore; },
+  get priceInput() { return priceInput; },
+  get range() { return range; },
+  get refresh() { return refresh; },
+  get render() { return render; },
+  get renderCalendar() { return renderCalendar; },
+  get renderClasses() { return renderClasses; },
+  get renderPlanning() { return renderPlanning; },
+  get renderReports() { return renderReports; },
+  get renderSettings() { return renderSettings; },
+  get renderStudent() { return renderStudent; },
+  get renderStudents() { return renderStudents; },
+  get runGoogleSync() { return runGoogleSync; },
+  get saveSettings() { return saveSettings; },
+  get scheduleDraft() { return scheduleDraft; },
+  get scheduleModal() { return scheduleModal; },
+  get scheduleTable() { return scheduleTable; },
+  get selectField() { return selectField; },
+  get sessionDraft() { return sessionDraft; },
+  get sessionModal() { return sessionModal; },
+  get setupConflicts() { return setupConflicts; },
+  get shortDays() { return shortDays; },
+  get shutdownLocalApp() { return shutdownLocalApp; },
+  get shutdownPrompt() { return shutdownPrompt; },
+  get statusBadge() { return statusBadge; },
+  get studentBadge() { return studentBadge; },
+  get studentBy() { return studentBy; },
+  get studentModal() { return studentModal; },
+  get studentStatus() { return studentStatus; },
+  get studentStatusNames() { return studentStatusNames; },
+  get submitBtn() { return submitBtn; },
+  get summary() { return summary; },
+  get syncOverlay() { return syncOverlay; },
+  get textField() { return textField; },
+  get toast() { return toast; },
+  get validateSlot() { return validateSlot; },
+  get webLink() { return webLink; },
+  get weekControls() { return weekControls; }
+};
 
-function confirmAction(title,message,label,callback,danger=false) {
-  modal(title,'',`<p class="small-text">${message}</p>`,cancelBtn+`<button type="submit" class="btn ${danger?'danger':'primary'}">${label}</button>`,async()=>{await callback();$('#dialog').close();});
-}
-function deleteSession(id) {
-  const row=findSession(id);if(!row)return;
-  const name=esc(row.studentName||fullname(studentBy(row.studentId)));
-  confirmAction('¿Eliminar solo esta sesión?',`Se eliminará la clase de <strong>${name}</strong> del ${fmtDate(row.date)} a las ${row.time}. Las demás sesiones y la planificación se conservan.${row.paymentStatus==='paid'?'<br><br>Esta clase tiene un pago registrado; también dejará de aparecer en los totales de pago.':''}<br><br>Se guarda una copia de seguridad antes de eliminar.`,'Eliminar esta sesión',async()=>{
-    await api(`/api/sessions/${encodeURIComponent(id)}`,'DELETE',{confirm:true});await refresh();await render();toast('Sesión eliminada. Las demás clases se conservan.');
-  },true);
-}
-function deleteStudent(id) {
-  const s=studentBy(id);confirmAction('¿Eliminar este alumno?',`Se eliminarán <strong>${esc(fullname(s))}</strong>, sus planificaciones y todo su historial. Esta acción no se puede deshacer desde la ficha. Se creará una copia de seguridad antes de eliminarlo.<br><br>Si quieres conservar el historial, puedes desactivar al alumno desde «Editar alumno».`,'Eliminar alumno',async()=>{await api(`/api/students/${id}`,'DELETE',{confirm:true});await refresh();location.hash='alumnos';await render();toast('Alumno eliminado.');},true);
-}
-function deleteSchedule(id) {confirmAction('¿Eliminar esta planificación?','Se eliminarán las próximas sesiones no realizadas de este horario. Las sesiones pasadas y las ya realizadas se conservan en el historial. Se creará una copia de seguridad antes del cambio.','Eliminar planificación',async()=>{await api(`/api/schedules/${id}`,'DELETE',{confirm:true});await refresh();await render();toast('Planificación eliminada.');},true);}
-async function saveSettings(ev) {
-  ev.preventDefault();const form=ev.target,v=formData(form);const button=$('button[form="settings-form"]');button.disabled=true;
-  try {
-    if(v.currency!==S.settings.currency&&S.schedules.length){const accepted=await new Promise(resolve=>{modal('Cambiar la moneda','Las tarifas no se convierten automáticamente.',`<p class="small-text">Todos los importes pasarán a mostrarse en ${esc(v.currency)} conservando sus valores numéricos. Revisa tus tarifas después del cambio.</p>`,cancelBtn+submitBtn('Cambiar moneda'),async()=>{$('#dialog').close();resolve(true);});$('#dialog').addEventListener('close',()=>resolve(false),{once:true});});if(!accepted)return;}
-    await api('/api/settings','PUT',v);await refresh();await render();toast('Configuración guardada.');
-  }catch(e){if($('#settings-error'))$('#settings-error').textContent=e.message;toast(e.message,true);}finally{button.disabled=false;}
-}
-function download(filename){const a=document.createElement('a');a.href=`/api/backups/file/${encodeURIComponent(filename)}`;a.download=filename;document.body.append(a);a.click();a.remove();}
-async function createBackup(local=false,button) {
-  button.disabled=true;const original=button.innerHTML;button.textContent='Creando copia…';
-  const token=$('#api-token')?.value||'';if($('#api-token'))$('#api-token').value='';
-  try{const result=await api(local?'/api/backups/local':'/api/backups','POST',local?{}:{token});if(local||S.settings.backupMode==='download')download(result.filename);toast(result.message||'Copia lista para descargar.');await render();}catch(e){toast(e.message,true);}finally{button.disabled=false;button.innerHTML=original;}
-}
-async function previewRestore(file) {
-  try{
-    if(file.size>16*1024*1024)throw new Error('La copia supera el límite de 16 MB comprimidos.');
-    const summary=await api('/api/restore/preview','POST',file,{'Content-Type':'application/octet-stream'});
-    modal('Restaurar una copia','Se reemplazarán los datos actuales.',`<div class="notice warning">${icon('info')}<span>La copia contiene ${summary.students} alumnos, ${summary.schedules} planificaciones y ${summary.sessions} sesiones guardadas y ${summary.busyBlocks||0} bloqueos de disponibilidad. Las futuras sesiones recurrentes se regeneran a partir de la planificación.</span></div><p class="small-text">Se guardará una copia de los datos actuales antes de restaurar.</p>${inputField('confirmation','Escribe RESTAURAR para confirmar','','text','required autocomplete="off"')}`,cancelBtn+submitBtn('Restaurar datos'),async form=>{if(form.elements.confirmation.value!=='RESTAURAR')throw new Error('Escribe RESTAURAR exactamente.');await api('/api/restore','POST',file,{'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'});$('#dialog').close();await refresh();await render();toast('Datos restaurados.');});
-  }catch(e){toast(e.message,true);}
-}
+let { weekControls, summary, layoutEvents, calendarGrid, legend, agenda, renderCalendar } = createCalendarUI(uiContext);
+let { webLink, noteLinks, linkedNotes, contactLinks, renderStudents, fillStudentTable, scheduleTable, renderStudent, studentModal, deleteStudent } = createStudentsUI(uiContext);
+let { statusBadge, classStatusPill, cycleClassStatus, classClock, paymentPill, findSession, validateSlot, classTable, renderClasses, sessionDraft, sessionModal, chooseScope, paymentModal, deleteSession } = createClassesUI(uiContext);
+let { renderPlanning, renderReports, scheduleDraft, scheduleModal, deleteSchedule, busyDraft, busyModal, deleteBusy, calendarCreateModal } = createPlanningUI(uiContext);
+let { syncOverlay, runGoogleSync, calendarConnectionWarning, checkCalendarEntry, openApplication, shutdownLocalApp, shutdownPrompt, calendarVisibilityControls, calendarRowVisible, googleClassOrigin, googleSyncStatus, calendarSyncControls, googleInboxPanel, googleSettings, loadGoogleCalendars, googleEventModal, googleCompleteModal } = createGoogleUI(uiContext);
+let { renderSettings, saveSettings, download, createBackup, previewRestore } = createSettingsUI(uiContext);
+let { inputField, selectField, textField, modal, conflictMarkup, setupConflicts, confirmConflicts, confirmAction } = createFormsUI(uiContext);
+
 document.addEventListener('click',async ev=>{
   const agendaMenu=$('#calendar-agendas');if(agendaMenu?.open&&!agendaMenu.contains(ev.target))agendaMenu.open=false;
   const themeChoice=ev.target.closest('[data-theme-choice]');if(themeChoice){applyTheme(themeChoice.dataset.themeChoice);return;}
@@ -623,7 +301,7 @@ document.addEventListener('click',async ev=>{
     if(action==='new-schedule')scheduleModal(null,b.dataset.student);if(action==='edit-schedule')scheduleModal(id);if(action==='delete-schedule')deleteSchedule(id);if(action==='edit-session')sessionModal(id);
     if(action==='prev-week'||action==='next-week'||action==='today'){S.week=action==='today'?weekOf(S.today):plusDays(S.week,action==='prev-week'?-7:7);S.planDay=null;await render();}
     if(action==='google-settings'){if($('#dialog').open)$('#dialog').close();location.hash='ajustes';return;}
-    if(action==='google-connect'){const result=await api('/api/google/connect','POST',{});location.href=result.url;return;}
+    if(action==='google-connect'){const result=await api('/api/google/connect','POST',{});closeGuard.approveNavigation();location.href=result.url;return;}
     if(['google-sync','google-pull','google-push'].includes(action)){await runGoogleSync(action==='google-push'?'push':'pull');if($('#dialog').open)$('#dialog').close();return;}
     if(action==='google-close-without'){await shutdownLocalApp();$('#dialog').close();return;}
     if(action==='google-calendars'){await loadGoogleCalendars();return;}
@@ -642,6 +320,7 @@ document.addEventListener('click',async ev=>{
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){const menu=$('#calendar-agendas');if(menu?.open){menu.open=false;$('summary',menu)?.focus();}}if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.agenda-item,.calendar-event')){ev.preventDefault();ev.target.click();}});
 $('#theme-toggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
 $('#shutdown').addEventListener('click',shutdownPrompt);
+closeGuard = installCloseGuard(window);
 $('#google-progress').addEventListener('cancel',event=>event.preventDefault());
 window.addEventListener('hashchange',()=>{if(S.opening)return;if(!location.hash.startsWith('#alumnos/'))S.studentTab='planning';render();});
 window.addEventListener('focus',async()=>{if(S.csrf&&!S.opening){try{const old=S.today;await refresh();if(old!==S.today)await render();}catch{}}});

@@ -1,4 +1,4 @@
-# Google Calendar dans Amapola 0.8.0
+# Google Calendar dans Amapola 0.8.1
 
 ## Première connexion
 
@@ -43,11 +43,11 @@ Un événement lié déplacé hors des 30 jours est aligné une fois, puis conse
 
 ## Progression, connexion et fermeture
 
-Une fenêtre avec une fleur animée bloque l'édition pendant l'échange. Elle reste ouverte jusqu'à la confirmation du résultat. Une erreur n'est pas présentée comme un échange réussi. Chaque bouton conserve l'heure de son dernier succès et devient vert après réussite ; un envoi n'est pas présenté comme une réception.
+Une fenêtre avec une fleur animée bloque l'édition pendant l'échange. Elle reste ouverte jusqu'à la confirmation du résultat. Une erreur n'est pas présentée comme un échange réussi. Chaque bouton conserve l'heure de son dernier succès et garde une indication de réussite en bordure ; un envoi n'est pas présenté comme une réception.
 
 À chaque entrée sur la page Calendrier, Amapola vérifie l'accès à Google sans importer d'événements. Si Google est déconnecté ou inaccessible, une fenêtre indique que les agendas ne sont pas actualisés. Les données locales restent utilisables. Il faut choisir **Actualizar** ou **Enviar** pour reprendre l'échange quand la connexion revient.
 
-**Cerrar aplicación** propose **Enviar y cerrar**, **Cerrar sin enviar** et **Cancelar**. L'envoi doit réussir avant la fermeture ; s'il échoue, Amapola reste ouverte. Fermer simplement l'onglet du navigateur n'arrête pas le programme local et ne permet pas d'afficher ce dialogue de fermeture personnalisé.
+**Cerrar aplicación** propose **Enviar y cerrar**, **Cerrar sin enviar** et **Cancelar**. L'envoi doit réussir avant la fermeture ; s'il échoue, Amapola reste ouverte. Fermer ou recharger l'onglet demande la confirmation native du navigateur après une interaction dans la page. Le navigateur impose son texte : ce dialogue ne contient pas les boutons d'envoi Google. Pour envoyer avant de quitter, annule la fermeture puis clique Enviar a Google, ou utilise Cerrar aplicación → Enviar y cerrar. Fermer l'onglet ne déclenche aucun envoi et n'arrête pas le programme local. Après un arrêt volontaire confirmé par le serveur, fermer l'onglet ne redemande pas de confirmation.
 
 Amapola.exe doit être ouvert pour échanger avec Google. Lorsque le PC est éteint, les événements déjà envoyés restent accessibles sur le téléphone. Les changements du téléphone seront récupérés à la prochaine ouverture avec Google connecté, ou à la prochaine réception manuelle.
 

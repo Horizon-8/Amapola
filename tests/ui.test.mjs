@@ -1,14 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { paymentState, hasEnded } from '../app/public/class-utils.mjs';
 import { attachCalendarGestures } from '../app/public/calendar-interactions.mjs';
-
-function uiDefinitions() {
-  const source=readFileSync(new URL('../app/public/app.js',import.meta.url),'utf8');
-  return source.slice(source.indexOf('/* Amapola'),source.indexOf("document.addEventListener('click'"));
-}
+import { uiDefinitions } from './ui-fixture.mjs';
 test('prospect filters, contact buttons and linked notes render safely and retain inactive separation',()=>{
   const elements={};
   const context=vm.createContext({URL,paymentState,hasEnded,window:{matchMedia:()=>({addEventListener(){}})},localStorage:{getItem:()=>null},
@@ -74,8 +69,7 @@ test('one-click class status advances the three states and never opens the class
 });
 
 test('calendar, ledger, profile and creation forms render payment controls and quarter-hour fields',()=>{
-  const source=readFileSync(new URL('../app/public/app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
-  const definitions=source.slice(source.indexOf('/* Amapola'),source.indexOf("document.addEventListener('click'"));
+  const definitions=uiDefinitions();
   const elements={};
   const context=vm.createContext({paymentState,hasEnded,window:{matchMedia:()=>({matches:false,addEventListener(){}})},localStorage:{getItem:()=>null},
     document:{querySelector:key=>elements[key]??=( {value:'weekly',disabled:false,addEventListener(){}} )}});

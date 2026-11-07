@@ -1,5 +1,14 @@
 # Amapola
 
+## Versión 0.8.1 - botones rosados, aviso al cerrar pestaña e interfaz modular
+
+Los dos botones Google usan la misma gama rosada, con degradados verticales opuestos. La interfaz se reparte en módulos de calendario, alumnos, clases y pagos, planificación, Google, parámetros y formularios compartidos. app.js conserva el estado y la coordinación.
+
+Cerrar o recargar una pestaña solicita la confirmación nativa del navegador, después de haber interactuado con la página. El texto y los botones los controla el navegador; no permite enviar a Google desde esa ventana. Para enviar, cancela el cierre y usa Enviar a Google, o elige Enviar y cerrar desde Cerrar aplicación. Un cierre intencionado de la aplicación desactiva este aviso después de confirmarse en el servidor. La conexión OAuth no muestra un aviso de salida adicional.
+
+No se ha añadido persistencia de cambios pendientes, un diario Google ni optimizaciones del histórico. No se han hecho pruebas en un navegador real.
+
+
 ## Versión 0.8.0 - calendario compacto y bienvenida
 
 Los botones Google tienen color y están junto a la navegación semanal y Semana/Agenda. Los agendas visibles se eligen en un menú desplegable con casillas; se mantiene abierto al cambiar una selección. Los resúmenes ocupan menos altura.

@@ -31,6 +31,7 @@ test('HTTP startup serves every imported frontend module with JavaScript MIME an
   assert.ok(source.includes(`health.version !== '${health.version}'`));
   const imports=[...source.matchAll(/await import\('\.([^']+)'\)/g)].map(match=>match[1]);
   assert.ok(imports.length>0);
+  for(const feature of ['assets','calendar','students','classes','planning','google','settings','forms','close-guard'])assert.ok(imports.includes(`/ui/${feature}.mjs`),feature);
   for(const route of imports){
     const response=await request(route);
     assert.equal(response.code,200,route);

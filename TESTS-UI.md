@@ -1,3 +1,13 @@
+# Pruebas de la versión 0.8.1
+
+1. Reabre Amapola.exe y comprueba v0.8.1. Los botones Google deben usar el mismo rosado, con degradados verticales en sentidos opuestos.
+2. Haz clic en la página y cierra la pestaña: el navegador debe pedir confirmación. Pulsa Cancelar para volver y enviar a Google. El texto es el mensaje nativo, no un diálogo personalizado de Amapola. Prueba también recargar. Sin interacción previa el navegador puede no mostrar la confirmación.
+3. Usa Cerrar aplicación → Enviar y cerrar, o Cerrar sin enviar. Tras el cierre confirmado, cerrar la pestaña no debe volver a avisar. Si falla el envío, la aplicación permanece abierta y el aviso sigue activo.
+4. Conectar Google debe abrir la autorización sin un aviso de salida adicional. Al volver, cerrar la pestaña vuelve a estar protegido.
+5. Recorre Calendario, Alumnos, ficha, Clases, Planificación, Informes y Mi información; prueba modos claro/oscuro y una edición/pago. Estas funciones se han trasladado a módulos, sin cambiar sus reglas.
+
+## Pruebas anteriores
+
 # Pruebas de la versión 0.8.0
 
 1. Reabre Amapola.exe: comprueba v0.8.0 y una bienvenida breve. Sin Google configurado, debe abrir el calendario normalmente. Con Google conectado recibe automáticamente, sin enviar; si tarda más de dos segundos, espera al resultado. Sin Internet abre con los datos locales y avisa; tras restaurar no recibe hasta reanudar.

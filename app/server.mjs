@@ -12,7 +12,7 @@ import { GoogleSync } from './google-sync.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.8.0';
+export const appVersion = '0.8.1';
 const buildHash = createHash('sha256');
 for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'google-data.mjs', 'google-sync.mjs', 'public/class-utils.mjs', 'public/calendar-clock.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');
@@ -119,6 +119,7 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
         files['/class-utils.mjs'] = ['class-utils.mjs', 'text/javascript; charset=utf-8'];
         files['/calendar-interactions.mjs'] = ['calendar-interactions.mjs', 'text/javascript; charset=utf-8'];
         files['/calendar-clock.mjs'] = ['calendar-clock.mjs', 'text/javascript; charset=utf-8'];
+        for(const file of ["ui/assets.mjs","ui/calendar.mjs","ui/students.mjs","ui/classes.mjs","ui/planning.mjs","ui/google.mjs","ui/settings.mjs","ui/forms.mjs","ui/close-guard.mjs"]) files['/'+file] = [file, 'text/javascript; charset=utf-8'];
         const asset = files[route]; if (!asset) throw new AppError('Página no encontrada.', 404);
         if (route === '/') res.setHeader('Set-Cookie', `${cookieName}=${secret}; Path=/; HttpOnly; SameSite=Strict`);
         const bytes = readFileSync(path.join(publicDir, asset[0]));

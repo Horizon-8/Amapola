@@ -1,9 +1,15 @@
 {
   "name": "amapola",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Gestión local de alumnos y clases",
   "type": "module",
-  "engines": { "node": ">=24.13.0 <25" },
-  "scripts": { "start": "node app/server.mjs --open", "test": "node --test", "check": "node --check app/server.mjs && node --check app/domain.mjs && node --check app/backup.mjs && node --check app/google-data.mjs && node --check app/google-sync.mjs && node --check app/public/app.js && node --check app/public/calendar-interactions.mjs && node --check app/public/calendar-clock.mjs && node --check app/public/class-utils.mjs" }
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
+  "scripts": {
+    "start": "node app/server.mjs --open",
+    "test": "node --test",
+    "check": "node --check app/server.mjs && node --check app/domain.mjs && node --check app/backup.mjs && node --check app/google-data.mjs && node --check app/google-sync.mjs && node --check app/public/app.js && node --check app/public/calendar-interactions.mjs && node --check app/public/calendar-clock.mjs && node --check app/public/class-utils.mjs && node --check app/public/ui/assets.mjs && node --check app/public/ui/calendar.mjs && node --check app/public/ui/students.mjs && node --check app/public/ui/classes.mjs && node --check app/public/ui/planning.mjs && node --check app/public/ui/google.mjs && node --check app/public/ui/settings.mjs && node --check app/public/ui/forms.mjs && node --check app/public/ui/close-guard.mjs"
+  }
 }

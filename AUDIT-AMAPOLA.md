@@ -1,5 +1,7 @@
 # Revue d'Amapola — 30 octobre 2026
 
+Décisions prises après cette revue : le découpage en modules est réalisé. Les tests dans un vrai navigateur et le suivi persistant des changements non envoyés ne sont pas retenus. L'optimisation de l'historique est reportée. Le journal Google reste une proposition, sans création de fichier de journal ni nouvelle table. Les recommandations ci-dessous constituent le constat initial.
+
 Cette revue porte sur le code local et les fonctions existantes. Les propositions ci-dessous ne sont pas implémentées. Les changements demandés pour cette version concernent uniquement la présentation du calendrier et l'ouverture animée avec réception Google.
 
 ## Mon avis
