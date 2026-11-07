@@ -62,6 +62,22 @@ test('HTTP status and single-session deletion preserve payment, require confirma
   const restored=await request('/api/restore',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},bytes});
   assert.equal(restored.code,200);assert.equal(app.store.occurrences(date,date)[0].status,'confirmed');
 });
+test('Google controls require local authentication and expose setup state without credentials',async t=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-google-routes-')),app=await startApp({dataDir:dir,port:0});
+  t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
+  const request=transport(app);assert.equal((await request('/api/google/status')).code,401);
+  const index=await request('/'),cookie=index.headers['set-cookie'].split(';')[0];
+  const boot=(await request('/api/bootstrap',{headers:{Cookie:cookie}})).json();
+  const headers={Cookie:cookie,Origin:app.url,'X-Amapola-Token':boot.csrf,'Content-Type':'application/json'};
+  assert.equal(boot.google.state,'disconnected');
+  assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{}})).code,409);
+  app.google.secrets={clientId:'test.apps.googleusercontent.com',clientSecret:'not-a-real-secret'};
+  const connect=await request('/api/google/connect',{method:'POST',headers,data:{}});assert.equal(connect.code,200);
+  assert.equal(new URL(connect.json().url).hostname,'accounts.google.com');
+  const status=await request('/api/google/status',{headers});assert.doesNotMatch(status.text(),/not-a-real-secret/);
+  assert.equal((await request('/api/google/client',{method:'POST',headers:{...headers,Origin:'https://wrong.example'},data:{}})).code,403);
+  assert.equal((await request('/oauth/google/callback?state=wrong&code=wrong')).code,400);
+});
 test('HTTP follow-up and overlap previews preserve data and use normal session authentication',async t=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-followup-routes-')),app=await startApp({dataDir:dir,port:0});
   t.after(async()=>{await app.close();await rm(dir,{recursive:true,force:true});});
@@ -118,7 +134,7 @@ test('HTTP handler connects class lists, payment changes, scoped calendar change
   const local=await request('/api/backups/local',{method:'POST',headers,data:{}});assert.equal(local.code,200);
   const downloaded=await request(`/api/backups/file/${local.json().filename}`,{headers});assert.equal(downloaded.code,200,downloaded.text());
   const archive=downloaded.bytes;
-  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,5);assert.equal(payload.sessions[0].paymentMethod,'cash');
+  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,6);assert.equal(payload.sessions[0].paymentMethod,'cash');
   await mutate(`/api/sessions/${next.id}/payment`,{paymentStatus:'unpaid',paymentMethod:''});
   const restored=await request('/api/restore',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},bytes:archive});assert.equal(restored.code,200);
   assert.equal(app.store.get('sessions',next.id).paymentStatus,'paid');

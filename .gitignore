@@ -17,3 +17,7 @@ copias/
 .codex/
 .DS_Store
 Thumbs.db
+
+google-connection.json*
+client_secret*.json
+credentials*.json

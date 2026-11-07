@@ -1,5 +1,11 @@
 # Guardar tus datos y cambiar de ordenador
 
+## Google Calendar — copias v6 (Amapola 0.6.0)
+
+Las copias actuales incluyen también los vínculos de clases con Google, los eventos importados, las clases por completar y la selección de agendas. Todos los datos anteriores (alumnos, pagos, conversaciones, planificaciones y bloqueos) se conservan. Las copias v1–v5 siguen siendo legibles.
+
+La autorización Google se guarda cifrada por separado en este PC; no está en el archivo .amapola. Al restaurar una copia, la sincronización queda en pausa. En otro PC debes importar el mismo cliente Google, reconectar la misma cuenta, comprobar los agendas y pulsar Reanudar. No hace falta cambiar fechas ni modificar una clase para guardar. Consulta GOOGLE-CALENDAR.md.
+
 ## Guardado diario
 
 Amapola guarda cada modificación automáticamente en el PC. También crea copias locales después de los cambios y al cerrar con **Cerrar aplicación**. No hay que editar una fecha, un día ni una clase para activar las copias.

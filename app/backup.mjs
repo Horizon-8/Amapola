@@ -24,6 +24,12 @@ export class Backups {
     this.timer = setTimeout(() => this.automatic().catch(() => { this.lastError = 'No se pudo crear la copia automática. Comprueba el espacio disponible y exporta una copia manual.'; }), 1200);
     this.timer.unref();
   }
+  async beforeGoogleSync() {
+    const copy=await this.snapshot('antes-de-sincronizar-google');
+    const names=(await readdir(this.dir)).filter(name=>/^amapola-antes-de-sincronizar-google-[a-z0-9-]+\.amapola$/i.test(name)).sort().reverse();
+    for(const name of names.slice(30))await unlink(path.join(this.dir,name));
+    return copy;
+  }
   async automatic() {
     const copy = await this.snapshot('auto');
     const files = (await readdir(this.dir)).filter(n => /^amapola-auto-[a-z0-9-]+\.amapola$/i.test(n)).sort().reverse();

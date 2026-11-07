@@ -8,12 +8,13 @@ import { spawn } from 'node:child_process';
 import { gunzipSync } from 'node:zlib';
 import { Store, AppError, validateArchive, todayIn, timeIn } from './domain.mjs';
 import { Backups } from './backup.mjs';
+import { GoogleSync } from './google-sync.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.5.2';
+export const appVersion = '0.6.0';
 const buildHash = createHash('sha256');
-for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'public/class-utils.mjs', 'public/calendar-clock.mjs']) buildHash.update(readFileSync(path.join(root, file)));
+for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'google-data.mjs', 'google-sync.mjs', 'public/class-utils.mjs', 'public/calendar-clock.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');
 export function openBrowser(url) {
   const child = process.platform === 'win32'
@@ -21,7 +22,7 @@ export function openBrowser(url) {
     : spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' });
   child.on('error', () => {}); child.unref();
 }
-export async function startApp({ dataDir, port = 3847, open = false, now, fetchImpl = fetch } = {}) {
+export async function startApp({ dataDir, port = 3847, open = false, now, fetchImpl = fetch, googleFetch = fetch } = {}) {
   dataDir ??= process.env.AMAPOLA_DATA_DIR || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'share'), 'Amapola', 'datos');
   dataDir = path.resolve(dataDir); mkdirSync(dataDir, { recursive: true });
   const id = createHash('sha256').update(dataDir.toLowerCase()).digest('hex').slice(0, 20);
@@ -79,6 +80,8 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
   try { store = new Store(path.join(dataDir, 'amapola.sqlite')); }
   catch (e) { unlinkSync(lockfile); throw e; }
   const backups = new Backups(store, dataDir);
+  const google = new GoogleSync(store, dataDir, { fetchImpl:googleFetch, backups, openBrowser });
+  await google.init();
   const secret = randomBytes(32).toString('hex');
   const cookieName = 'amapola_local';
   let actualPort, origin, destructiveBusy = false;
@@ -104,6 +107,12 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
       if (![`127.0.0.1:${actualPort}`, `localhost:${actualPort}`].includes(req.headers.host)) throw new AppError('Host no autorizado.', 403);
       const url = new URL(req.url, origin), route = url.pathname, method = req.method;
       if (route === '/api/health' && method === 'GET') return send(res, 200, { app: 'amapola', version: appVersion, build: buildId, instance: id });
+      if (route === '/oauth/google/callback' && method === 'GET') {
+        let success=false;
+        try { await google.callback(url.searchParams);success=true; } catch(error) { google.message=error instanceof AppError?error.message:'No se pudo conectar Google. Vuelve a intentarlo desde Amapola.'; }
+        const html=`<!doctype html><html lang="es"><meta charset="utf-8"><title>Google · Amapola</title><body><h1>${success?'Google conectado':'No se pudo conectar Google'}</h1><p>${success?(google.config.paused?'Vuelve a Amapola, revisa los agendas y pulsa Reanudar.':'Puedes volver a Amapola. Se está iniciando la sincronización.'):'Vuelve a Mi información para revisar la conexión e intentarlo de nuevo.'}</p><a href="${origin}/#ajustes">Volver a Amapola</a></body></html>`;
+        res.writeHead(success?200:400,{'Content-Type':'text/html; charset=utf-8'});return res.end(html);
+      }
       if (!route.startsWith('/api/')) {
         if (method !== 'GET' && method !== 'HEAD') throw new AppError('Método no permitido.', 405);
         const files = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/favicon.svg': ['favicon.svg', 'image/svg+xml'] };
@@ -121,32 +130,44 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
         const allowed = [`http://127.0.0.1:${actualPort}`, `http://localhost:${actualPort}`];
         if (!allowed.includes(req.headers.origin) || req.headers['x-amapola-token'] !== secret) throw new AppError('Solicitud no autorizada. Recarga la página.', 403);
         if (destructiveBusy) throw new AppError('Hay una restauración o eliminación en curso. Espera un momento.', 409);
+        if (google.busy && !['/api/google/disconnect','/api/google/sync','/api/shutdown'].includes(route)) throw new AppError('Sincronización Google en curso. Espera a que termine y vuelve a guardar; tus campos siguen en el formulario.',409);
       }
+      if(route==='/api/google/status'&&method==='GET')return send(res,200,google.status());
+      if(route==='/api/google/calendars'&&method==='GET')return send(res,200,{calendars:await google.calendars()});
+      if(route==='/api/google/client'&&method==='POST')return send(res,200,await google.configure(await body(req)));
+      if(route==='/api/google/connect'&&method==='POST'){await body(req);return send(res,200,await google.authorize(origin));}
+      if(route==='/api/google/disconnect'&&method==='POST'){await body(req);await google.disconnect();return send(res,200,google.status());}
+      if(route==='/api/google/calendars'&&method==='PUT'){const value=await body(req);return send(res,200,await google.selectCalendars(value.ids));}
+      if(route==='/api/google/sync'&&method==='POST'){await body(req);if(!google.status().connected)throw new AppError('Conecta Google en Mi información. Los cambios locales están guardados.',409);if(google.config.paused)throw new AppError('Revisa la conexión y pulsa Reanudar en Mi información.',409);void google.run();return send(res,202,google.status());}
+      if(route==='/api/google/resume'&&method==='POST'){await body(req);google.resume();return send(res,200,google.status());}
+      const googleComplete=route.match(/^\/api\/google\/inbox\/(event-[a-f0-9]{64})$/);
+      if(googleComplete&&method==='POST'){const row=google.complete(googleComplete[1],await body(req));backups.schedule();google.touch();return send(res,201,row);}
+      if(route==='/api/google/resolve'&&method==='POST'){const value=await body(req);google.resolve(value.key,value.choice);backups.schedule();google.touch();return send(res,200,google.status());}
       if (route === '/api/bootstrap' && method === 'GET') {
         store.freezePast();
-        return send(res, 200, { csrf: secret, settings: store.settings(), students: store.all('students'), schedules: store.all('schedules'), today: todayIn(store.settings().timezone), time: timeIn(store.settings().timezone), dataDir, backupError: backups.lastError });
+        return send(res, 200, { csrf: secret, settings: store.settings(), students: store.all('students'), schedules: store.all('schedules'), today: todayIn(store.settings().timezone), time: timeIn(store.settings().timezone), dataDir, backupError: backups.lastError,google:google.status() });
       }
       if (route === '/api/occurrences' && method === 'GET') return send(res, 200, store.occurrences(url.searchParams.get('from'), url.searchParams.get('to'), url.searchParams.get('student') || ''));
       if (route === '/api/reports' && method === 'GET') return send(res, 200, store.report(url.searchParams.get('week') || todayIn(store.settings().timezone)));
       if (route === '/api/classes' && method === 'GET') return send(res, 200, store.classLedger(Object.fromEntries(url.searchParams)));
       if (route === '/api/conflicts' && method === 'POST') return send(res, 200, store.conflicts(await body(req)));
       if (route === '/api/busy-blocks' && method === 'GET') return send(res, 200, store.busyBlocks(url.searchParams.get('from'), url.searchParams.get('to')));
-      if (route === '/api/busy-blocks' && method === 'POST') { const row=store.saveBusyBlock(await body(req)); backups.schedule(); return send(res,201,row); }
+      if (route === '/api/busy-blocks' && method === 'POST') { const row=store.saveBusyBlock(await body(req)); backups.schedule(); google.touch(); return send(res,201,row); }
       const busyMatch = route.match(/^\/api\/busy-blocks\/([^/]+)$/);
-      if (busyMatch && method === 'PUT') { const row=store.saveBusyBlock(await body(req),decodeURIComponent(busyMatch[1])); backups.schedule(); return send(res,200,row); }
+      if (busyMatch && method === 'PUT') { const row=store.saveBusyBlock(await body(req),decodeURIComponent(busyMatch[1])); backups.schedule(); google.touch(); return send(res,200,row); }
       if (busyMatch && method === 'DELETE') {
         const value=await body(req); if(value.confirm!==true) throw new AppError('Confirma la eliminación.');
         destructiveBusy=true;
-        try { await backups.snapshot('antes-de-eliminar'); store.deleteBusyBlock(decodeURIComponent(busyMatch[1])); backups.schedule(); return send(res,200,{ok:true}); }
+        try { await backups.snapshot('antes-de-eliminar'); store.deleteBusyBlock(decodeURIComponent(busyMatch[1])); backups.schedule(); google.touch(); return send(res,200,{ok:true}); }
         finally { destructiveBusy=false; }
       }
       const sessionAction = route.match(/^\/api\/sessions\/([^/]+)\/(payment|change|status)$/);
       if (sessionAction && method === 'PUT') {
         const value = await body(req), sessionId = decodeURIComponent(sessionAction[1]);
         const row = sessionAction[2] === 'payment' ? store.savePayment(value, sessionId) : sessionAction[2] === 'status' ? store.saveSessionStatus(value, sessionId) : store.changeSession(value, sessionId);
-        backups.schedule(); return send(res, 200, row);
+        backups.schedule(); google.touch(); return send(res, 200, row);
       }
-      if (route === '/api/students' && method === 'POST') { const row = store.saveStudent(await body(req)); backups.schedule(); return send(res, 201, row); }
+      if (route === '/api/students' && method === 'POST') { const row = store.saveStudent(await body(req)); backups.schedule(); google.touch(); return send(res, 201, row); }
       const history = route.match(/^\/api\/students\/([^/]+)\/history$/);
       if (history && method === 'GET') return send(res, 200, store.history(decodeURIComponent(history[1])));
       const match = route.match(/^\/api\/(students|schedules|sessions)\/(.+)$/);
@@ -157,7 +178,7 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
           if (table === 'students') row = store.saveStudent(v, recordId);
           if (table === 'schedules') row = store.saveSchedule(v, recordId);
           if (table === 'sessions') row = store.saveSession(v, recordId);
-          backups.schedule(); return send(res, 200, row);
+          backups.schedule(); google.touch(); return send(res, 200, row);
         }
         if (method === 'DELETE') {
           const v = await body(req); if (v.confirm !== true) throw new AppError('Confirma la eliminación.');
@@ -165,12 +186,12 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
           try {
             await backups.snapshot('antes-de-eliminar');
             if (table === 'students') store.deleteStudent(recordId); else if (table === 'sessions') store.deleteSession(recordId); else store.deleteSchedule(recordId);
-            backups.schedule(); return send(res, 200, { ok: true });
+            backups.schedule(); google.touch(); return send(res, 200, { ok: true });
           } finally { destructiveBusy = false; }
         }
       }
-      if (route === '/api/schedules' && method === 'POST') { const row = store.saveSchedule(await body(req)); backups.schedule(); return send(res, 201, row); }
-      if (route === '/api/settings' && method === 'PUT') { const row = store.saveSettings(await body(req)); backups.schedule(); return send(res, 200, row); }
+      if (route === '/api/schedules' && method === 'POST') { const row = store.saveSchedule(await body(req)); backups.schedule(); google.touch(); return send(res, 201, row); }
+      if (route === '/api/settings' && method === 'PUT') { const row = store.saveSettings(await body(req)); backups.schedule(); google.touch(); return send(res, 200, row); }
       if (route === '/api/backups' && method === 'GET') return send(res, 200, { files: await backups.list(), error: backups.lastError });
       if (route === '/api/backups' && method === 'POST') { const v = await body(req); return send(res, 200, await backups.send(typeof v.token === 'string' ? v.token : '')); }
       if (route === '/api/backups/local' && method === 'POST') { await body(req); const copy = await backups.snapshot(); return send(res, 200, { filename: copy.filename }); }
@@ -191,7 +212,7 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
         destructiveBusy = true;
         try {
           const safety = await backups.snapshot('antes-de-restaurar');
-          store.importData(raw); backups.schedule();
+          store.importData(raw); google.pauseAfterRestore();backups.schedule();
           return send(res, 200, { ok: true, safetyCopy: safety.filename });
         } finally { destructiveBusy = false; }
       }
@@ -209,20 +230,22 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
   } catch (e) {
     if (e.code === 'EADDRINUSE' && port !== 0) {
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-    } else { store.close(); unlinkSync(lockfile); throw e; }
+    } else { await google.close();store.close(); unlinkSync(lockfile); throw e; }
   }
   actualPort = server.address().port; origin = `http://127.0.0.1:${actualPort}`;
   writeFileSync(lockfile, JSON.stringify({ pid: process.pid, port: actualPort }), { mode: 0o600 });
   let closing = false;
   async function close() {
     if (closing) return; closing = true; clearTimeout(backups.timer);
+    await google.close();
     await new Promise(resolve => { server.close(resolve); server.closeIdleConnections(); });
     try { await backups.automatic(); } catch {}
     store.close(); try { unlinkSync(lockfile); } catch {}
   }
   console.log(`Amapola disponible en ${origin}`);
   if (open) openBrowser(origin);
-  return { url: origin, server, store, backups, close, dataDir, reused: false };
+  if(google.status().connected&&!google.config.paused)google.schedule(0);
+  return { url: origin, server, store, backups, google,close, dataDir, reused: false };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--background')) {

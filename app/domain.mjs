@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { paymentState, hasEnded } from './public/class-utils.mjs';
+import { syncRows, googleBusy } from './google-data.mjs';
 
 export class AppError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -127,21 +128,23 @@ CREATE TABLE IF NOT EXISTS busy_blocks (
  id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL, time TEXT NOT NULL,
  duration INTEGER NOT NULL CHECK(duration>0), notes TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS busy_blocks_date ON busy_blocks(date);
+CREATE TABLE IF NOT EXISTS google_sync (id TEXT PRIMARY KEY, json TEXT NOT NULL);
 `;
 const tableCols = {
   students: ['id', 'firstName', 'lastName', 'channel', 'phone', 'email', 'messenger', 'notes', 'color', 'active', 'createdAt', 'stage'],
   schedules: ['id', 'studentId', 'title', 'time', 'duration', 'price', 'modality', 'notes', 'startDate', 'endDate', 'weekday', 'recurrence', 'active'],
   sessions: ['id', 'scheduleId', 'originalDate', 'studentId', 'title', 'date', 'time', 'duration', 'price', 'modality', 'notes', 'status', 'paymentStatus', 'paymentMethod', 'isOverride', 'isDeleted'],
   busy_blocks: ['id', 'title', 'date', 'time', 'duration', 'notes'],
+  google_sync: ['id', 'json'],
 };
 export class Store {
   constructor(file) {
     this.db = new DatabaseSync(file);
     this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
     const version = this.db.prepare('PRAGMA user_version').get().user_version;
-    if (version > 5) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
+    if (version > 6) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
     try {
-      if ([1, 2, 3, 4].includes(version) && file !== ':memory:') {
+      if ([1, 2, 3, 4, 5].includes(version) && file !== ':memory:') {
         const dir = path.join(path.dirname(file), 'copias'); mkdirSync(dir, { recursive: true });
         const payload = { app: 'amapola', version, createdAt: new Date().toISOString(), settings: this.settings(), students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions') };
         if (version >= 3) payload.busy_blocks = this.all('busy_blocks');
@@ -163,7 +166,7 @@ export class Store {
         }
         const studentColumns = new Set(this.db.prepare('PRAGMA table_info(students)').all().map(c => c.name));
         if (!studentColumns.has('stage')) this.db.exec("ALTER TABLE students ADD COLUMN stage TEXT NOT NULL DEFAULT 'student' CHECK(stage IN ('student','prospect'));");
-        this.db.exec('PRAGMA user_version=5;');
+        this.db.exec('PRAGMA user_version=6;');
       });
     } catch (error) { this.db.close(); throw error; }
     this.db.prepare('INSERT OR IGNORE INTO settings(id,json) VALUES(1,?)').run(JSON.stringify(defaults));
@@ -384,6 +387,7 @@ export class Store {
         }
       }
       events.push(...this.all('busy_blocks').filter(s => s.date >= from && s.date <= to).map(s => ({ ...s, kind: 'busy' })));
+      events.push(...googleBusy(this.all('google_sync'),this.settings().timezone,from,to));
       const byDate = new Map();
       for (const e of events) { if (!byDate.has(e.date)) byDate.set(e.date, []); byDate.get(e.date).push(e); }
       const found = [];
@@ -404,7 +408,7 @@ export class Store {
   busyBlocks(from, to) {
     dateValue(from); dateValue(to);
     if (from > to || (Date.parse(to) - Date.parse(from)) / 86400000 > 370) throw new AppError('Selecciona un intervalo de hasta un año.');
-    return this.db.prepare('SELECT * FROM busy_blocks WHERE date>=? AND date<=? ORDER BY date,time,id').all(from,to).map(row=>({...row,kind:'busy'}));
+    return [...this.db.prepare('SELECT * FROM busy_blocks WHERE date>=? AND date<=? ORDER BY date,time,id').all(from,to).map(row=>({...row,kind:'busy'})),...googleBusy(this.all('google_sync'),this.settings().timezone,from,to)];
   }
   deleteBusyBlock(id) {
     this.get('busy_blocks', id);
@@ -455,22 +459,26 @@ export class Store {
   }
   exportData() {
     this.freezePast();
-    return this.transaction(() => ({ app: 'amapola', version: 5, createdAt: new Date().toISOString(), settings: this.settings(),
-      students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions'), busy_blocks: this.all('busy_blocks') }));
+    return this.transaction(() => ({ app: 'amapola', version: 6, createdAt: new Date().toISOString(), settings: this.settings(),
+      students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions'), busy_blocks: this.all('busy_blocks'),google_sync:this.all('google_sync') }));
   }
   importData(raw) {
     const data = validateArchive(raw);
     this.transaction(() => {
-      this.db.exec('DELETE FROM busy_blocks; DELETE FROM sessions; DELETE FROM schedules; DELETE FROM students;');
-      for (const table of ['students', 'schedules', 'sessions', 'busy_blocks']) for (const row of data[table]) this.insert(table, row);
+      this.db.exec('DELETE FROM google_sync; DELETE FROM busy_blocks; DELETE FROM sessions; DELETE FROM schedules; DELETE FROM students;');
+      for (const table of ['students', 'schedules', 'sessions', 'busy_blocks','google_sync']) for (const row of data[table]) this.insert(table, row);
+      const google=this.db.prepare("SELECT json FROM google_sync WHERE id='config'").get();
+      if(google)this.db.prepare("UPDATE google_sync SET json=? WHERE id='config'").run(JSON.stringify({...JSON.parse(google.json),paused:true}));
       this.saveSettings(data.settings);
     });
   }
   close() { this.db.close(); }
 }
 export function validateArchive(raw) {
-  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
-  const data = { settings: settingsInput(raw.settings), students: [], schedules: [], sessions: [], busy_blocks: [] };
+  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5, 6].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
+  const data = { settings: settingsInput(raw.settings), students: [], schedules: [], sessions: [], busy_blocks: [],google_sync:[] };
+  try { data.google_sync=syncRows(raw.version>=6?raw.google_sync:[]); } catch { throw new AppError('Datos de sincronización Google no válidos en la copia.'); }
+  if(new Set(data.google_sync.map(r=>r.id)).size!==data.google_sync.length)throw new AppError('Datos Google duplicados en la copia.');
   if (raw.version < 3) raw = { ...raw, busy_blocks: [] };
   const ids = {}, max = { students: 100000, schedules: 200000, sessions: 500000, busy_blocks: 100000 };
   for (const table of Object.keys(max)) {

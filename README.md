@@ -1,5 +1,13 @@
 # Amapola
 
+## Versión 0.6.0 — Google Calendar, lista para configurar y probar
+
+Abre **Amapola.exe del proyecto** y comprueba **v0.6.0** al pie. **Mi información → Sincronización con Google Calendar** permite importar la conexión Google, autorizar la cuenta y seleccionar los agendas leídos. Todos están seleccionados por defecto; Amapola escribe únicamente en el agenda Amapola creado por la aplicación. Consulta **GOOGLE-CALENDAR.md** para la primera conexión y las reglas completas.
+
+El indicador superior y **Sincronizar** muestran el estado real. Cada paso importa Google antes de enviar cambios locales. Los eventos ajenos se muestran como **Busy** gris rayado; una descripción que empieza por Amapola crea una clase **Por completar**, pendiente de alumno y tarifa. Los precios y pagos de las descripciones son informativos. Las eliminaciones confirmadas por Google cancelan clases sin borrar pagos; una eliminación solicitada en Amapola elimina su evento Google después del import. Los cambios quedan guardados localmente si falta conexión.
+
+Base y copias **v6**, con migración y copia previa, incluyendo los vínculos Google y las clases pendientes. La autorización cifrada de Windows se guarda por separado; hay que reconectar el mismo cliente y cuenta en otro PC. Restaurar una copia pausa la sincronización hasta revisarla y reanudarla. Las copias antiguas v1–v5 siguen siendo legibles. No se ha creado un ZIP 0.6.0: primero se hacen las pruebas de usuario.
+
 ## Versión 0.5.2 — hora actual en el calendario, lista para probar
 
 Abre **Amapola.exe del proyecto** y comprueba **v0.5.2** al pie. La semana muestra una línea rosa con un punto en el día actual. Su posición se actualiza cada 30 segundos y al volver a la ventana, sin recargar ni interrumpir la edición de una clase. Sigue la zona horaria de Mi información, también sin Internet. Al abrir la semana actual por primera vez, el calendario se sitúa cerca de la hora actual; al editar, conserva tu desplazamiento.

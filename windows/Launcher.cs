@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Amapola")]
 [assembly: AssemblyDescription("Gestión local de alumnos y clases")]
-[assembly: AssemblyVersion("0.5.2.0")]
+[assembly: AssemblyVersion("0.6.0.0")]
 
 internal static class Launcher
 {

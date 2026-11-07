@@ -135,6 +135,22 @@ test('calendar, ledger, profile and creation forms render payment controls and q
   assert.match(context.dialogues[5].body,/value="11:15"/);assert.match(context.dialogues[5].body,/value="30"/);
 });
 
+test('Google settings select calendars and imported busy or pending lessons render safely without editing handles',()=>{
+  const context=vm.createContext({URL,paymentState,hasEnded,window:{matchMedia:()=>({addEventListener(){}})},localStorage:{getItem:()=>null},document:{querySelector:()=>({})}});
+  vm.runInContext(uiDefinitions()+`
+    S.today='2026-10-30';S.week='2026-10-26';S.students=[];
+    S.google={state:'synced',connected:true,configured:true,calendarId:'target',sourceIds:null,inbox:[{id:'event-test',title:'Clase <nueva>',date:S.today,time:'10:15',calendarName:'Personal'}],reviews:[]};
+    S.googleCalendars=[{id:'target',title:'Amapola'},{id:'personal',title:'Personal <privado>',primary:true}];
+    globalThis.settings=googleSettings();globalThis.inbox=googleInboxPanel();
+    const busy={id:'google1',googleRecord:'event-test',kind:'busy',source:'google',readOnly:true,needsAssignment:true,date:S.today,time:'10:15',duration:45,title:'Clase <nueva>',calendarName:'Personal',notes:''};
+    globalThis.week=calendarGrid([busy]);globalThis.agendaHTML=agenda([busy]);
+  `,context);
+  assert.match(context.settings,/name="calendar" value="target" checked disabled/);assert.match(context.settings,/name="calendar" value="personal" checked/);
+  assert.match(context.settings,/Personal &lt;privado&gt;/);assert.match(context.inbox,/Completar clase/);assert.doesNotMatch(context.inbox,/<nueva>/);
+  assert.match(context.week,/google-busy google-pending/);assert.match(context.week,/data-action="google-event" data-read-only="true"/);assert.doesNotMatch(context.week,/data-resize=/);
+  assert.match(context.agendaHTML,/Google · Completar clase/);assert.match(context.agendaHTML,/data-action="google-event"/);
+});
+
 function fakeTarget() {
   const handlers=new Map();
   return {addEventListener(type,fn,{signal}={}) { if(!handlers.has(type))handlers.set(type,[]);handlers.get(type).push(fn);signal?.addEventListener('abort',()=>handlers.set(type,handlers.get(type).filter(f=>f!==fn)),{once:true}); },
@@ -163,6 +179,9 @@ test('pointer gestures create, move, resize and cancel without persisting during
   const statusButton={closest:selector=>selector.includes('class-status')?{}:null};
   root.emit('pointerdown',event(statusButton,120,y(480)));root.emit('pointerup',event(statusButton,120,y(480)));
   assert.equal(clicked,0);assert.equal(created.length,0);assert.equal(changed.length,0);
+  row.readOnly=true;
+  root.emit('pointerdown',event(block,120,y(490)));root.emit('pointermove',event(block,220,y(505)));root.emit('pointerup',event(block,220,y(505)));
+  assert.equal(changed.length,0);assert.equal(created.length,0);row.readOnly=false;
   root.emit('pointerdown',event(blank,120,y(480)));assert.equal(created.length,0);
   root.emit('pointerup',event(blank,120,y(480)));assert.deepEqual(created[0],{date:'2026-10-21',time:'08:00',duration:60});
   root.emit('pointerdown',event(blank,120,y(480)));root.emit('pointermove',event(blank,120,y(500)));root.emit('pointerup',event(blank,120,y(500)));

@@ -67,6 +67,7 @@ export function attachCalendarGestures(root, { rows, onCreate, onChange }) {
     const lane = event.target.closest('.day-lane'); if (!lane) return;
     const element = event.target.closest('.calendar-event');
     const row = element && rows.find(r => r.id === element.dataset.id);
+    if (row?.readOnly) return;
     const edge = event.target.closest('[data-resize]')?.dataset.resize;
     const anchor = minuteAt(lane, event.clientY);
     drag = { pointerId: event.pointerId, initialX: event.clientX, initialY: event.clientY, x: event.clientX, y: event.clientY,

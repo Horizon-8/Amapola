@@ -1,4 +1,20 @@
-# Pruebas de la versión 0.5.2 — hora actual
+# Pruebas de la versión 0.6.0 — Google Calendar
+
+La primera conexión se describe en GOOGLE-CALENDAR.md. Abre Amapola.exe del proyecto y comprueba v0.6.0. Usa datos y agendas de prueba para el primer ensayo.
+
+1. En Mi información, importa el JSON de un cliente Google de escritorio y autoriza la cuenta. Pulsa Cargar agendas: todos están seleccionados inicialmente. Guarda una selección y comprueba que Amapola permanece marcado. Reabre la aplicación: debe conservar la selección y la conexión de este PC.
+2. Desde Google crea una cita en un agenda personal y una cita de día completo. Pulsa Sincronizar: deben aparecer en gris rayado, con el título y origen Google. No deben generar clases ni ingresos. Intenta crear una clase a la misma hora: debe advertir del solapamiento. Los bloques Google no se arrastran ni se eliminan desde Amapola.
+3. Desde el teléfono crea un evento en el agenda Amapola con descripción Amapola al principio. Sincroniza: debe verse Por completar, sin ingresos. Asocia alumno, tarifa y modalidad; comprueba que se convierte en una sesión puntual, sin duplicar el evento Google, y que su descripción informativa se actualiza.
+4. Repite desde otro agenda: antes de asociarlo, debe explicar que conserva el original y crea otro evento en el agenda Amapola. Ningún evento personal se modifica.
+5. Crea, mueve y redimensiona una clase en Amapola. El estado debe pasar a cambios pendientes, sincronizando y sincronizado; el evento debe aparecer en el agenda Amapola. Marca pagada con método: la descripción Google debe actualizarse.
+6. Desde el teléfono cambia título y horario. Al reabrir Amapola o pulsar Sincronizar, debe recuperar los cambios sin alterar alumno, tarifa ni pago. Cambiar números de la descripción Google no cambia los importes locales.
+7. Elimina el evento desde Google: la clase queda cancelada en Amapola, con su pago e historial. No debe reaparecer automáticamente en Google. Reactivarla desde Amapola crea de nuevo un evento vinculado.
+8. Desconecta Internet después de guardar una clase. Debe mostrar fuera de conexión y conservar los cambios. Al reconectar y sincronizar, debe terminar sin duplicados. Una conexión fallida nunca cancela las clases.
+9. Elimina una clase desde Amapola: se crea copia previa y, al sincronizar, se elimina su evento Google. Si estaba pendiente la eliminación y cambió en Google, debe pedir revisar y elegir antes de eliminarlo.
+10. Cambia de agenda seleccionado y vuelve al calendario: los agendas desmarcados dejan de ocupar la vista; los datos Google y las citas originales permanecen en Google. Prueba Semana, Agenda, temas claro/oscuro y ventana estrecha.
+11. Descarga y restaura una copia en una instalación de prueba: alumnos, pagos, vínculos y pendientes deben conservarse; Google queda en pausa. Reconecta el mismo cliente/cuenta, revisa la selección y reanuda. Las autorizaciones no están en el archivo .amapola.
+
+## Pruebas anteriores: hora actual (0.5.2)
 
 1. Abre Amapola.exe del proyecto y comprueba v0.5.2 al pie. En Calendario → Semana → Hoy, debe aparecer una línea rosa oscura con un punto en la columna de hoy, a la altura de la hora actual según la zona horaria de Mi información.
 2. Deja la vista abierta un minuto: la marca debe avanzar sin recargar la página. Cambia de ventana y vuelve; comprueba que la hora se actualiza al instante y que el desplazamiento no salta mientras consultas o editas una clase.

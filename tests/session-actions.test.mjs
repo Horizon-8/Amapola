@@ -40,7 +40,7 @@ test('deleting one recurring class excludes it from calendar, totals and conflic
   for(const operation of [()=>db.deleteSession(row.id),()=>db.savePayment({paymentStatus:'unpaid'},row.id),()=>db.saveSessionStatus({status:'confirmed'},row.id),()=>db.saveSession({...row,status:'planned'},row.id)])assert.throws(operation,error=>error.status===404);
   db.saveSchedule({...rule,active:true,time:'10:15'},rule.id);
   assert.equal(db.occurrences(date,date).length,0);
-  const archive=db.exportData();assert.equal(archive.version,5);db.importData(archive);
+  const archive=db.exportData();assert.equal(archive.version,6);db.importData(archive);
   assert.equal(db.occurrences(date,date).length,0);assert.equal(db.all('sessions').find(s=>s.originalDate===date).isDeleted,1);
 });
 test('deleted past classes stay deleted after materialization and history/ledger reports exclude them',t=>{
@@ -78,7 +78,7 @@ test('a real v4 schema migrates with a safety backup, unchanged payments and val
     const definition=db.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'").get().sql.replace("'planned','confirmed','completed','cancelled'","'planned','completed','cancelled'");
     db.db.exec(`ALTER TABLE sessions RENAME TO sessions_previous; ${definition}; INSERT INTO sessions SELECT * FROM sessions_previous; DROP TABLE sessions_previous; CREATE INDEX sessions_date ON sessions(date); PRAGMA user_version=4;`);
     db.close();db=new Store(file);
-    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,5);
+    assert.equal(db.db.prepare('PRAGMA user_version').get().user_version,6);
     assert.equal(db.get('sessions',paid.id).paymentMethod,'card');assert.equal(db.get('sessions',paid.id).isDeleted,0);
     assert.equal(db.saveSessionStatus({status:'confirmed'},paid.id).status,'confirmed');
     assert.deepEqual(db.db.prepare('PRAGMA foreign_key_check').all(),[]);
