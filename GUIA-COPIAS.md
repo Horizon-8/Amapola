@@ -1,5 +1,11 @@
 # Guardar tus datos y cambiar de ordenador
 
+## Copias actuales v7 — Amapola 0.7.0
+
+Incluyen todas las clases, pagos, alumnos, contactos, planificaciones (también Cada dos semanas), bloqueos, vínculos Google, clases por completar, selección de agendas recibidos y preferencias de agendas visibles. La actualización crea antes una copia con el formato anterior. Se pueden restaurar archivos v1–v6 además de v7.
+
+Las autorizaciones Google siguen cifradas por separado en este PC, fuera del archivo .amapola. Al restaurar se pausa la conexión hasta revisarla. Después, recibir y enviar son acciones manuales independientes; no se envía automáticamente una copia antigua a Google. Consulta GOOGLE-CALENDAR.md.
+
 ## Google Calendar — copias v6 (Amapola 0.6.0)
 
 Las copias actuales incluyen también los vínculos de clases con Google, los eventos importados, las clases por completar y la selección de agendas. Todos los datos anteriores (alumnos, pagos, conversaciones, planificaciones y bloqueos) se conservan. Las copias v1–v5 siguen siendo legibles.

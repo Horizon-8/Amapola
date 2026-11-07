@@ -12,7 +12,7 @@ import { GoogleSync } from './google-sync.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-export const appVersion = '0.6.1';
+export const appVersion = '0.7.0';
 const buildHash = createHash('sha256');
 for (const file of ['server.mjs', 'domain.mjs', 'backup.mjs', 'google-data.mjs', 'google-sync.mjs', 'public/class-utils.mjs', 'public/calendar-clock.mjs']) buildHash.update(readFileSync(path.join(root, file)));
 export const buildId = buildHash.digest('hex');
@@ -130,19 +130,20 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
         const allowed = [`http://127.0.0.1:${actualPort}`, `http://localhost:${actualPort}`];
         if (!allowed.includes(req.headers.origin) || req.headers['x-amapola-token'] !== secret) throw new AppError('Solicitud no autorizada. Recarga la página.', 403);
         if (destructiveBusy) throw new AppError('Hay una restauración o eliminación en curso. Espera un momento.', 409);
-        if (google.busy && !['/api/google/disconnect','/api/google/sync','/api/shutdown'].includes(route)) throw new AppError('Sincronización Google en curso. Espera a que termine y vuelve a guardar; tus campos siguen en el formulario.',409);
+        if (google.busy && !['/api/google/disconnect','/api/google/sync','/api/google/check','/api/shutdown'].includes(route)) throw new AppError('Sincronización Google en curso. Espera a que termine y vuelve a guardar; tus campos siguen en el formulario.',409);
       }
       if(route==='/api/google/status'&&method==='GET')return send(res,200,google.status());
+      if(route==='/api/google/check'&&method==='POST'){await body(req);return send(res,200,await google.checkConnection());}
+      if(route==='/api/google/visibility'&&method==='PUT'){const value=await body(req);const status=google.setVisibility(value.hiddenIds);backups.schedule();return send(res,200,status);}
       if(route==='/api/google/calendars'&&method==='GET')return send(res,200,{calendars:await google.calendars()});
       if(route==='/api/google/client'&&method==='POST')return send(res,200,await google.configure(await body(req)));
       if(route==='/api/google/connect'&&method==='POST'){await body(req);return send(res,200,await google.authorize(origin));}
       if(route==='/api/google/disconnect'&&method==='POST'){await body(req);await google.disconnect();return send(res,200,google.status());}
       if(route==='/api/google/calendars'&&method==='PUT'){const value=await body(req);return send(res,200,await google.selectCalendars(value.ids));}
-      if(route==='/api/google/sync'&&method==='POST'){const value=await body(req),direction=value.direction??'both';if(!['both','pull','push'].includes(direction))throw new AppError('Dirección de sincronización no válida.');if(!google.status().connected)throw new AppError('Conecta Google en Mi información. Los cambios locales están guardados.',409);if(google.config.paused)throw new AppError('Revisa la conexión y pulsa Reanudar en Mi información.',409);void google.run(direction);return send(res,202,google.status());}
+      if(route==='/api/google/sync'&&method==='POST'){const value=await body(req),direction=value.direction??'pull';if(!['pull','push'].includes(direction))throw new AppError('Dirección de sincronización no válida.');if(google.busy)throw new AppError('Ya hay una sincronización en curso.',409);if(!google.status().connected)throw new AppError('Conecta Google en Mi información. Los cambios locales están guardados.',409);if(google.config.paused)throw new AppError('Revisa la conexión y pulsa Reanudar en Mi información.',409);void google.run(direction);return send(res,202,google.status());}
       if(route==='/api/google/resume'&&method==='POST'){await body(req);google.resume();return send(res,200,google.status());}
       const googleComplete=route.match(/^\/api\/google\/inbox\/(event-[a-f0-9]{64})$/);
       if(googleComplete&&method==='POST'){const row=google.complete(googleComplete[1],await body(req));backups.schedule();google.touch();return send(res,201,row);}
-      if(route==='/api/google/resolve'&&method==='POST'){const value=await body(req);google.resolve(value.key,value.choice);backups.schedule();google.touch();return send(res,200,google.status());}
       if (route === '/api/bootstrap' && method === 'GET') {
         store.freezePast();
         return send(res, 200, { csrf: secret, settings: store.settings(), students: store.all('students'), schedules: store.all('schedules'), today: todayIn(store.settings().timezone), time: timeIn(store.settings().timezone), dataDir, backupError: backups.lastError,google:google.status() });
@@ -244,7 +245,6 @@ export async function startApp({ dataDir, port = 3847, open = false, now, fetchI
   }
   console.log(`Amapola disponible en ${origin}`);
   if (open) openBrowser(origin);
-  if(google.status().connected&&!google.config.paused)google.schedule(0);
   return { url: origin, server, store, backups, google,close, dataDir, reused: false };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -82,6 +82,25 @@ test('Google controls require local authentication and expose setup state withou
   assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'push'}})).code,202);
   assert.deepEqual(directions,['pull','push']);
   assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'invalid'}})).code,400);
+  assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'both'}})).code,400);
+  const visibility=await request('/api/google/visibility',{method:'PUT',headers,data:{hiddenIds:['$amapola','personal']}});assert.equal(visibility.code,200);assert.deepEqual(visibility.json().hiddenCalendarIds,['$amapola','personal']);
+});
+test('an in-progress Google exchange blocks domain mutations until every event is confirmed',async t=>{
+  let release,entered;const waiting=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+  const googleFetch=async(url,options={})=>{
+    if(url.includes('/users/me/calendarList'))return new Response(JSON.stringify({items:[{id:'personal',summary:'Personal',primary:true,accessRole:'owner'},{id:'target',summary:'Amapola',accessRole:'owner'}]}));
+    entered();await gate;return new Response(JSON.stringify({...JSON.parse(options.body),id:'linked',etag:'confirmed'}));
+  };
+  const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-sync-lock-')),app=await startApp({dataDir:dir,port:0,googleFetch});
+  t.after(async()=>{release();await app.close();await rm(dir,{recursive:true,force:true});});
+  app.google.config={...app.google.config,account:'personal',calendarId:'target'};app.google.secrets={accessToken:'test-only',refreshToken:'test-only',expires:Date.now()+3600000};
+  const student=app.store.saveStudent({firstName:'Ana',color:'#bc587a'}),date=addDays(todayIn(defaults.timezone),1);app.store.saveSchedule({studentId:student.id,title:'Clase',startDate:date,weekday:weekday(date),time:'10:00',duration:60,price:0,recurrence:'once'});
+  const request=transport(app),index=await request('/'),cookie=index.headers['set-cookie'].split(';')[0],boot=(await request('/api/bootstrap',{headers:{Cookie:cookie}})).json();
+  const headers={Cookie:cookie,Origin:app.url,'Content-Type':'application/json','X-Amapola-Token':boot.csrf};
+  assert.equal((await request('/api/google/sync',{method:'POST',headers,data:{direction:'push'}})).code,202);await waiting;
+  assert.equal((await request('/api/students',{method:'POST',headers,data:{firstName:'Blocked',color:'#bc587a'}})).code,409);
+  assert.equal((await request('/api/google/status',{headers})).json().operation.ok,null);release();await app.google.running;await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await request('/api/google/status',{headers})).json().operation.ok,true);assert.equal(app.store.all('students').length,1);
 });
 test('HTTP follow-up and overlap previews preserve data and use normal session authentication',async t=>{
   const dir=await mkdtemp(path.join(os.tmpdir(),'amapola-followup-routes-')),app=await startApp({dataDir:dir,port:0});
@@ -139,7 +158,7 @@ test('HTTP handler connects class lists, payment changes, scoped calendar change
   const local=await request('/api/backups/local',{method:'POST',headers,data:{}});assert.equal(local.code,200);
   const downloaded=await request(`/api/backups/file/${local.json().filename}`,{headers});assert.equal(downloaded.code,200,downloaded.text());
   const archive=downloaded.bytes;
-  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,6);assert.equal(payload.sessions[0].paymentMethod,'cash');
+  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,7);assert.equal(payload.sessions[0].paymentMethod,'cash');
   await mutate(`/api/sessions/${next.id}/payment`,{paymentStatus:'unpaid',paymentMethod:''});
   const restored=await request('/api/restore',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},bytes:archive});assert.equal(restored.code,200);
   assert.equal(app.store.get('sessions',next.id).paymentStatus,'paid');

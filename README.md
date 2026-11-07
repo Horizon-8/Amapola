@@ -1,5 +1,17 @@
 # Amapola
 
+## Versión 0.7.0 — Google manual, agendas visibles y clases cada dos semanas
+
+Abre **Amapola.exe del proyecto** y comprueba **v0.7.0** al pie. Al abrir, una ventana propone **recibir** Google. Después los intercambios son manuales: **Actualizar desde Google ↓** aplica Google a las clases vinculadas y a los bloques Busy; **Enviar a Google ↑** aplica directamente las clases Amapola al agenda Amapola, sin recuperar cambios del teléfono. No hay intercambios automáticos después de editar ni cada dos minutos.
+
+Las clases nunca enviadas se conservan al actualizar. Una eliminación Google cancela la clase local y mantiene su pago. Si la clase fue eliminada localmente pero sigue en Google, Actualizar la restaura. Enviar puede recrear un evento eliminado en Google o aplicar una eliminación local, sin confirmaciones adicionales. Se mantiene el periodo de 30 días.
+
+La flor animada bloquea la edición durante el intercambio, con progreso y confirmación final. Los botones distinguen recepción/envío y quedan verdes tras el éxito. Al entrar en Calendario se comprueba la conexión; si Google está desconectado se advierte que los agendas no están actualizados. **Agendas visibles** oculta o muestra cada agenda sin quitarlo de los recibidos y sin desactivar avisos de solapamiento. Los detalles identifican el agenda de origen.
+
+Al cerrar con **Cerrar aplicación** se ofrece **Enviar y cerrar / Cerrar sin enviar / Cancelar**. Si el envío falla, la aplicación permanece abierta. Cerrar la pestaña del navegador no equivale a detener el programa local.
+
+La planificación permite **Cada dos semanas**, con intervalos de 14 días, conservación del ciclo al editar y cambios de esta sesión o las siguientes. Los cursos recibidos de Google siguen siendo puntuales y requieren completar el alumno/tarifa cuando no están asociados. Base y copias **v7**, con copia previa a la migración y lectura de archivos v1–v6. No se ha generado un ZIP: primero se hacen las pruebas locales.
+
 ## Versión 0.6.1 — sincronización a 30 días y controles del calendario
 
 Abre **Amapola.exe del proyecto** y comprueba **v0.6.1** al pie. Google sincroniza los próximos **30 días**, incluyendo hoy, según la zona horaria del espacio. La página Calendario incluye **Recibir de Google** (solo importar) y **Enviar a Google** (comprobar Google y después enviar). El botón general **Sincronizar** y la sincronización automática conservan ambos pasos. La configuración muestra por separado la última recepción y el último envío.

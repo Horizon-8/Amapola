@@ -1,4 +1,18 @@
-# Pruebas de la versión 0.6.1 — mes y controles de sincronización
+# Pruebas de la versión 0.7.0 — prioridades manuales, filtros y repetición
+
+1. Abre Amapola.exe y comprueba v0.7.0. Con Google conectado debe ofrecer recibir al abrir. Prueba recibir y trabajar sin actualizar. Durante un intercambio debe aparecer la flor animada y no debe poder editarse el calendario, tampoco pulsando Escape.
+2. En una clase vinculada, cambia la hora solo en Amapola y pulsa Actualizar: recupera la hora Google aunque Google no haya cambiado desde el último recibo. Las clases nuevas jamás enviadas permanecen intactas. Tarifas y pagos permanecen locales.
+3. Modifica una clase en el teléfono y pulsa Enviar en Amapola sin actualizar antes: Google recibe los datos locales; Amapola no recupera el cambio del teléfono. Los demás agendas y bloques Busy no se modifican ni se vuelven a descargar con ese envío.
+4. Elimina una clase en Amapola y pulsa Actualizar: si sigue en Google debe reaparecer aquí. Elimínala y pulsa Enviar: desaparece en Google. No se piden confirmaciones adicionales de reconciliación después de elegir la flecha.
+5. Elimina un evento en Google y Actualiza: la clase queda cancelada, con su historial y pago. Si lo eliminas en Google pero pulsas Enviar antes de actualizar, debe recrearse con los datos locales. Una clase cancelada local se envía con su indicación Cancelada.
+6. Marca o desmarca agendas en Agendas visibles. Comprueba Semana y Agenda, incluida la opción Amapola. La selección se conserva al reiniciar y al restaurar una copia. Un agenda oculto sigue avisando de solapamientos. La selección de agendas recibidos sigue siendo independiente en Mi información.
+7. Abre un bloque Busy: debe identificar su agenda Google. Abre una clase: debe indicar Amapola y si está vinculada o pendiente de enviar. Un evento nuevo del agenda Google Amapola debe aparecer Por completar, sin crear una planificación.
+8. Desconecta Internet, ve a otra página y vuelve a Calendario: debe avisar cada vez que los agendas no se actualizaron. Una recepción fallida no cancela clases ni marca el botón como recibido con éxito. Reconecta y Actualiza: debe terminar y quedar verde con su hora.
+9. Edita una clase y espera: no debe enviarse sola. Usa Cerrar aplicación: comprueba Cancelar, Cerrar sin enviar y Enviar y cerrar. Si se corta Internet al enviar, no debe cerrarse; debe permitir reintentar o cerrar sin enviar.
+10. Crea una planificación Cada dos semanas. Comprueba intervalos de 14 días y una semana intermedia sin clases. Cambia tarifa sin alterar la fase. Mueve esta y las siguientes y comprueba pagos, excepciones y sesiones borradas.
+11. Descarga y restaura una copia v7: deben conservarse pagos, vínculos Google, agendas visibles y repetición quincenal. Las copias antiguas siguen siendo legibles; la sincronización permanece en pausa tras restaurar hasta revisar y reanudar.
+
+## Pruebas anteriores: mes y controles (0.6.1)
 
 1. Abre Amapola.exe del proyecto y comprueba v0.6.1. En Calendario deben aparecer **Recibir de Google** y **Enviar a Google**, con el periodo Próximos 30 días. Se habilitan cuando Google está conectado y no hay otra sincronización en curso.
 2. Crea una cita en Google y una clase local pendiente. Pulsa Recibir de Google: la cita debe bajar, sin enviar la clase local. El estado indica datos recibidos o cambios locales pendientes; la fecha del último envío no cambia.

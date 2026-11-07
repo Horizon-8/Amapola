@@ -1,4 +1,4 @@
-# Google Calendar dans Amapola 0.6.1
+# Google Calendar dans Amapola 0.7.0
 
 ## Première connexion
 
@@ -13,35 +13,51 @@ Cette configuration se fait une fois pour ton application. La connexion Google d
 
 Les permissions demandées permettent de lire les agendas accessibles et leurs événements, et de gérer les événements des agendas créés par l'application. Amapola écrit uniquement dans l'agenda Amapola qu'elle a créé. Elle ne modifie pas tes événements personnels.
 
-## Règles
+## Recevoir et envoyer
 
-- Au lancement, après une modification locale et toutes les deux minutes lorsque le programme est ouvert : **Google → Amapola**, puis **Amapola → Google**. Le bouton général **Sincronizar** permet de demander les deux étapes immédiatement.
-- Sur la page Calendrier, **Recibir de Google** importe uniquement : aucun événement n'est envoyé, modifié ou supprimé dans Google par ce passage. **Enviar a Google** vérifie d'abord les changements Google, puis envoie les changements locaux. La synchronisation automatique habituelle reste active.
-- La fenêtre synchronisée couvre **30 jours glissants**, d'aujourd'hui au jour 29 inclus, selon le fuseau horaire configuré. Aucun historique antérieur ni année entière n'est transféré. Un événement déjà lié qui est déplacé hors de cette fenêtre est aligné une fois, puis reste conservé sans être consulté à chaque passage tant qu'il reste hors période. Sortir de la fenêtre ne signifie jamais qu'il a été supprimé. Les séries Amapola sont envoyées sous forme de sessions individuelles sur ce mois.
-- Les autres événements Google sont des blocs **Busy**, gris rayés, avec leur titre d'origine. Les événements sur plusieurs jours et les journées entières occupent les jours correspondants. Un bloc Google se modifie dans Google.
-- Une description commençant par **Amapola** crée une entrée **Por completar** : sélectionner l'élève, le tarif, la modalité et vérifier l'horaire. Cette entrée ne génère aucun revenu avant son association. La classe créée est ponctuelle, sans nouvelle planification récurrente.
-- Pour éviter une copie dans deux agendas Google, crée les cours directement dans l'agenda **Amapola**. Si tu marques un événement d'un autre agenda, Amapola conserve l'original et t'avertit avant de créer son événement lié dans l'agenda Amapola. Les modifications ultérieures de l'original sont aussi récupérées ; un changement direct dans l'agenda Amapola est prioritaire si les deux ont changé au même passage.
-- Google commande les changements de titre, de date et d'horaire. Le tarif, l'élève, la modalité et le paiement se modifient dans Amapola ; leur copie dans la description Google est informative. Aucun prix saisi dans une description Google ne modifie les paiements.
-- Une suppression **confirmée par Google** annule la classe dans Amapola et conserve son paiement et son historique. Une réponse incomplète, une erreur de permission ou une coupure réseau n'est jamais interprétée comme une suppression.
-- Supprimer une classe dans Amapola supprime son événement Google au prochain passage réussi, après l'import. Une suppression en attente et une modification concurrente dans Google demandent de choisir **Conservar Google** ou de confirmer **Aplicar eliminación Amapola**.
-- Une classe annulée depuis Amapola reste visible dans Google avec le préfixe **[Cancelada]** et ne bloque plus le créneau Google. Réactiver une classe dont l'événement Google avait été supprimé crée un nouvel événement lié.
-- Un horaire Google inhabituel reste visible et peut demander une correction. Les créations et corrections faites dans Amapola conservent les pas de 15 minutes.
+À l'ouverture, Amapola propose de recevoir les prochains **30 jours**, aujourd'hui inclus. Tu peux accepter ou travailler avec les données déjà présentes sur le PC. Ensuite, les échanges sont manuels : aucune modification n'est envoyée automatiquement et aucun échange périodique ne démarre en arrière-plan.
 
-## Statut et fonctionnement hors connexion
+| Bouton du calendrier | Source prioritaire | Résultat |
+| --- | --- | --- |
+| **Actualizar desde Google ↓** | Google | Actualise les agendas sélectionnés et les classes déjà liées ; n'écrit rien dans Google. |
+| **Enviar a Google ↑** | Amapola | Applique directement les classes locales à l'agenda Google Amapola ; ne reçoit pas les modifications du téléphone. |
 
-Le haut de l'application affiche l'état Google : déconnecté, en cours, changements à envoyer, données reçues, synchronisé, hors connexion ou à vérifier. Les paramètres distinguent la dernière réception, le dernier envoi et la dernière synchronisation complète. Une réception seule n'est pas annoncée comme un envoi terminé. Les erreurs réseau affichent aussi une notification. Les données sont d'abord enregistrées sur le PC. Si Google est indisponible, les modifications sont reprises lors d'un prochain passage réussi ; un état hors connexion ne signifie pas « synchronisé ».
+Une réception applique le titre, la date, l'horaire et l'état Google aux classes liées, même si la version Google n'a pas changé depuis la dernière réception. Une classe locale jamais envoyée reste présente. Une classe supprimée localement réapparaît si elle existe encore dans Google. Une suppression confirmée par Google annule la classe locale en conservant son paiement et son historique. Une coupure réseau, une liste incomplète ou une erreur de permission ne compte jamais comme une suppression.
 
-Amapola.exe doit être ouvert pour synchroniser. Quand le PC est éteint, les événements déjà envoyés restent accessibles sur le téléphone. Les modifications du téléphone seront récupérées au prochain lancement d'Amapola.
+Un envoi met à jour les classes existantes, crée les nouvelles et supprime dans Google celles supprimées localement. Une classe locale dont l'événement a été supprimé sur le téléphone est recréée. Le sens choisi s'applique directement, sans confirmation supplémentaire de rapprochement. Les autres agendas Google ne sont jamais modifiés.
 
-Pendant un passage de synchronisation, une modification locale peut demander d'attendre avant d'enregistrer. Le formulaire reste rempli. Cette règle évite de mélanger des écritures pendant le rapprochement. La première exportation se fait par lots de 25 événements pour garder une progression visible.
+L'élève, le tarif, la modalité et le paiement restent gérés dans Amapola. Leur description dans Google est informative. Les identifiants des événements et des propriétés privées permettent de retrouver les classes ; il n'est pas nécessaire de copier ces identifiants à la main.
+
+## Agendas et nouveaux cours
+
+- Dans **Mi información → Sincronización con Google Calendar**, choisis les agendas à recevoir. L'agenda Amapola lié reste inclus. Il est créé lors du premier envoi si nécessaire.
+- Dans le calendrier, **Agendas visibles** permet de masquer ou d'afficher chacun des agendas reçus, les cours Amapola et les blocs locaux. Cela ne change pas la sélection des agendas à recevoir. Les événements masqués continuent à compter dans les avertissements de chevauchement.
+- Les événements des autres agendas apparaissent comme des blocs **Busy**, gris rayés, avec leur titre et leur agenda d'origine. Ils se modifient dans Google. Les journées entières et les événements sur plusieurs jours occupent les jours correspondants.
+- Un événement non associé créé dans l'agenda Google **Amapola**, ou dont la description commence par **Amapola** dans un autre agenda, apparaît **Por completar**. Complète l'élève, le tarif, la modalité et l'horaire. Il devient une classe ponctuelle, sans planification récurrente automatique ni revenu avant son association.
+- Crée de préférence les cours directement dans l'agenda Google Amapola. L'association d'un événement d'un autre agenda conserve son original et prépare une classe dans l'agenda Amapola, sans modifier l'agenda personnel. Après l'association, la classe liée dans l'agenda Amapola fait référence ; l'original reste un bloc Busy indépendant.
+- Les planifications Amapola sont envoyées sous forme de sessions individuelles sur le mois. La répétition **Cada dos semanas** conserve un intervalle de 14 jours.
+- Une classe annulée localement reste visible dans Google avec le préfixe **[Cancelada]** et ne bloque plus le créneau Google. Une classe supprimée localement est supprimée de Google à l'envoi.
+- Un horaire Google hors des pas de 15 minutes est conservé et signalé pour correction. Les créations et modifications dans Amapola restent par pas de 15 minutes.
+
+Un événement lié déplacé hors des 30 jours est aligné une fois, puis conservé sans être consulté à chaque passage tant qu'il reste hors période. Sortir de la fenêtre ne signifie jamais une suppression. Aucun historique antérieur ni année entière n'est transféré.
+
+## Progression, connexion et fermeture
+
+Une fenêtre avec une fleur animée bloque l'édition pendant l'échange. Elle reste ouverte jusqu'à la confirmation du résultat. Une erreur n'est pas présentée comme un échange réussi. Chaque bouton conserve l'heure de son dernier succès et devient vert après réussite ; un envoi n'est pas présenté comme une réception.
+
+À chaque entrée sur la page Calendrier, Amapola vérifie l'accès à Google sans importer d'événements. Si Google est déconnecté ou inaccessible, une fenêtre indique que les agendas ne sont pas actualisés. Les données locales restent utilisables. Il faut choisir **Actualizar** ou **Enviar** pour reprendre l'échange quand la connexion revient.
+
+**Cerrar aplicación** propose **Enviar y cerrar**, **Cerrar sin enviar** et **Cancelar**. L'envoi doit réussir avant la fermeture ; s'il échoue, Amapola reste ouverte. Fermer simplement l'onglet du navigateur n'arrête pas le programme local et ne permet pas d'afficher ce dialogue de fermeture personnalisé.
+
+Amapola.exe doit être ouvert pour échanger avec Google. Lorsque le PC est éteint, les événements déjà envoyés restent accessibles sur le téléphone. Les changements du téléphone seront récupérés à la prochaine réception acceptée.
 
 ## Sauvegarde et changement de PC
 
-Les copies `.amapola` **v6** conservent les liens entre événements et classes, les imports à compléter, les agendas sélectionnés et tous les paiements, élèves, planifications et indisponibilités. Les anciennes copies v1 à v5 restent lisibles par Amapola 0.6.0.
+Les copies **.amapola v7** conservent les liens entre événements et classes, les imports à compléter, les agendas sélectionnés, les préférences d'affichage et tous les paiements, élèves, contacts, planifications et indisponibilités. Amapola 0.7.0 lit également les copies v1 à v6. La migration crée d'abord une copie de sécurité dans l'ancien format.
 
-Les autorisations Google sont stockées séparément dans `google-connection.json`, dans le dossier de données du PC, et chiffrées avec le compte Windows. Elles ne sont pas incluses dans le ZIP, GitHub ou les sauvegardes `.amapola`.
+Les autorisations Google sont stockées séparément dans **google-connection.json**, dans le dossier de données du PC, et chiffrées avec le compte Windows. Elles ne sont pas incluses dans le ZIP, GitHub ou les sauvegardes .amapola.
 
-Sur un autre PC : installer la version compatible, restaurer la copie, importer le **même fichier client Google**, reconnecter le **même compte**, vérifier les agendas puis cliquer **Reanudar sincronización**. Une restauration met la synchronisation en pause pour ne pas envoyer automatiquement une ancienne copie vers Google. Les liens sauvegardés servent à retrouver les événements existants.
+Sur un autre PC : installer la version compatible, restaurer la copie, importer le **même fichier client Google**, reconnecter le **même compte**, vérifier les agendas puis cliquer **Reanudar sincronización**. La restauration met la connexion en pause. Reprendre ne lance aucun envoi : choisis ensuite explicitement la direction souhaitée. Les liens sauvegardés servent à retrouver les événements existants.
 
 Les trente dernières copies de sécurité précédant des changements de classes par Google sont conservées localement, en plus des sauvegardes automatiques habituelles.
 
@@ -49,5 +65,4 @@ Les trente dernières copies de sécurité précédant des changements de classe
 
 - OAuth pour application de bureau : https://developers.google.com/identity/protocols/oauth2/native-app
 - Permissions Calendar : https://developers.google.com/workspace/calendar/api/auth
-- Identification cachée des événements : https://developers.google.com/workspace/calendar/api/guides/extended-properties
-- Contrôle des modifications concurrentes : https://developers.google.com/workspace/calendar/api/guides/version-resources
+- Identification privée des événements : https://developers.google.com/workspace/calendar/api/guides/extended-properties

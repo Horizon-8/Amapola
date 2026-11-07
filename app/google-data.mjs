@@ -12,12 +12,14 @@ export function syncRows(rows = []) {
     const value = JSON.parse(row.json);
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Datos de Google no válidos.');
     const fields = row.id === 'config'
-      ? ['namespace','account','calendarId','clientId','sourceIds','paused','lastSync','lastPull','lastPush']
+      ? ['namespace','account','calendarId','clientId','sourceIds','paused','lastSync','lastPull','lastPush','hiddenCalendarIds','calendars']
       : row.id.startsWith('link-')
         ? ['key','sessionId','googleId','etag','baseHash','infoHash','gone','review','conflict','remote']
         : ['calendarId','calendarName','event','pending','dismissed','linkKey'];
     const clean = Object.fromEntries(fields.filter(key=>Object.hasOwn(value,key)).map(key=>[key,value[key]]));
     if (row.id === 'config' && (!/^[a-f0-9-]{36}$/.test(clean.namespace) || (clean.sourceIds !== null && (!Array.isArray(clean.sourceIds) || clean.sourceIds.length > 1000 || clean.sourceIds.some(id=>!googleId(id)))))) throw Error('Configuración Google no válida.');
+    if(row.id==='config'&&clean.hiddenCalendarIds!==undefined&&(!Array.isArray(clean.hiddenCalendarIds)||clean.hiddenCalendarIds.length>1000||clean.hiddenCalendarIds.some(id=>!googleId(id))))throw Error('Agendas ocultos no válidos.');
+    if(row.id==='config'&&clean.calendars!==undefined&&(!Array.isArray(clean.calendars)||clean.calendars.length>1000||clean.calendars.some(c=>!googleId(c?.id)||typeof c.title!=='string'||c.title.length>2000)))throw Error('Lista de agendas no válida.');
     if (row.id.startsWith('link-') && (!googleId(clean.key) || !googleId(clean.googleId))) throw Error('Vínculo Google no válido.');
     if (row.id.startsWith('event-') && (!googleId(clean.calendarId) || !googleId(clean.event?.id))) throw Error('Evento Google no válido.');
     return {id:row.id,json:JSON.stringify(clean)};
@@ -56,10 +58,10 @@ export function googleBusy(rows, zone, from, to) {
   for(const row of rows){
     if(!row.id.startsWith('event-'))continue;
     const record=JSON.parse(row.json);
-    if(record.dismissed||(record.linkKey&&!record.pending)||(selected?.sourceIds!==null&&selected?.sourceIds&&!selected.sourceIds.includes(record.calendarId)&&record.calendarId!==selected.calendarId))continue;
+    if(record.dismissed||(record.linkKey&&!record.pending&&record.calendarId===selected?.calendarId)||(selected?.sourceIds!==null&&selected?.sourceIds&&!selected.sourceIds.includes(record.calendarId)&&record.calendarId!==selected.calendarId))continue;
     const event=record.event;
     for(const part of eventSegments(event,zone,from,to))output.push({...part,id:`${row.id}:${part.date}`,googleRecord:row.id,kind:'busy',source:'google',readOnly:true,needsAssignment:!!record.pending,
-      title:String(event.summary||'Sin título').slice(0,150),notes:'',calendarName:String(record.calendarName||''),googleUrl:event.htmlLink||''});
+      title:String(event.summary||'Sin título').slice(0,150),notes:'',calendarId:record.calendarId,calendarName:String(record.calendarName||''),googleUrl:event.htmlLink||''});
   }
   return output;
 }

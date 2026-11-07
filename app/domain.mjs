@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
@@ -8,6 +8,10 @@ import { syncRows, googleBusy } from './google-data.mjs';
 
 export class AppError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
+}
+function storedSessionId(id){
+  if(typeof id!=='string'||! /^[a-f0-9-]{36}@\d{4}-\d{2}-\d{2}$/i.test(id))return id;
+  const h=createHash('sha256').update('amapola-session:'+id).digest('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-5${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`;
 }
 export const defaults = {
   name: '', business: 'Mis clases', email: '', phone: '', notes: '',
@@ -65,7 +69,7 @@ export function scheduleInput(v, options) {
   const endDate = v.endDate ? dateValue(v.endDate, 'Fin') : '';
   if (endDate && endDate < startDate) throw new AppError('El fin debe ser posterior al inicio.');
   return { ...c, startDate, endDate, weekday: integer(v.weekday, 0, 6, 'Día'),
-    recurrence: choice(v.recurrence ?? 'weekly', ['weekly', 'once'], 'Repetición'), active: bool(v.active ?? true) };
+    recurrence: choice(v.recurrence ?? 'weekly', ['weekly', 'biweekly', 'once'], 'Repetición'), active: bool(v.active ?? true) };
 }
 export function settingsInput(v) {
   const result = {};
@@ -142,12 +146,13 @@ export class Store {
     this.db = new DatabaseSync(file);
     this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
     const version = this.db.prepare('PRAGMA user_version').get().user_version;
-    if (version > 6) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
+    if (version > 7) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
     try {
-      if ([1, 2, 3, 4, 5].includes(version) && file !== ':memory:') {
+      if ([1, 2, 3, 4, 5, 6].includes(version) && file !== ':memory:') {
         const dir = path.join(path.dirname(file), 'copias'); mkdirSync(dir, { recursive: true });
         const payload = { app: 'amapola', version, createdAt: new Date().toISOString(), settings: this.settings(), students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions') };
         if (version >= 3) payload.busy_blocks = this.all('busy_blocks');
+        if (version >= 6) payload.google_sync = this.all('google_sync');
         writeFileSync(path.join(dir, `amapola-antes-de-actualizar-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 6)}.amapola`), gzipSync(Buffer.from(JSON.stringify(payload))), { flag: 'wx', mode: 0o600 });
       }
       this.transaction(() => {
@@ -166,7 +171,11 @@ export class Store {
         }
         const studentColumns = new Set(this.db.prepare('PRAGMA table_info(students)').all().map(c => c.name));
         if (!studentColumns.has('stage')) this.db.exec("ALTER TABLE students ADD COLUMN stage TEXT NOT NULL DEFAULT 'student' CHECK(stage IN ('student','prospect'));");
-        this.db.exec('PRAGMA user_version=6;');
+        if(version<7){
+          const moved=new Map();for(const row of this.db.prepare("SELECT id FROM sessions WHERE instr(id,'@')>0").all()){const next=storedSessionId(row.id);if(next!==row.id){this.db.prepare('UPDATE sessions SET id=? WHERE id=?').run(next,row.id);moved.set(row.id,next);}}
+          if(moved.size)for(const row of this.all('google_sync')){const value=JSON.parse(row.json);if(moved.has(value.sessionId))this.db.prepare('UPDATE google_sync SET json=? WHERE id=?').run(JSON.stringify({...value,sessionId:moved.get(value.sessionId)}),row.id);}
+        }
+        this.db.exec('PRAGMA user_version=7;');
       });
     } catch (error) { this.db.close(); throw error; }
     this.db.prepare('INSERT OR IGNORE INTO settings(id,json) VALUES(1,?)').run(JSON.stringify(defaults));
@@ -191,9 +200,13 @@ export class Store {
     let end = s.endDate && s.endDate < to ? s.endDate : to;
     if (s.recurrence === 'once') return s.startDate >= from && s.startDate <= end ? [s.startDate] : [];
     if (start > end) return [];
-    start = addDays(start, (s.weekday - weekday(start) + 7) % 7);
+    const interval=s.recurrence==='biweekly'?14:7;
+    const anchor=addDays(s.startDate,(s.weekday-weekday(s.startDate)+7)%7);
+    if(start<anchor)start=anchor;
+    const elapsed=Math.round((Date.parse(start)-Date.parse(anchor))/86400000);
+    start=addDays(start,(interval-elapsed%interval)%interval);
     const dates = [];
-    for (let d = start; d <= end; d = addDays(d, 7)) dates.push(d);
+    for (let d = start; d <= end; d = addDays(d, interval)) dates.push(d);
     return dates;
   }
   projected(s, date) { return { id: `${s.id}@${date}`, scheduleId: s.id, originalDate: date, studentId: s.studentId, title: s.title,
@@ -240,7 +253,13 @@ export class Store {
         const old = this.get('schedules', id);
         if (old.studentId !== data.studentId) throw new AppError('No se puede cambiar el alumno de una planificación existente.');
         const today = todayIn(this.settings().timezone);
-        if (data.startDate < today) data.startDate = today;
+        if (data.startDate < today) {
+          if(old.recurrence==='biweekly'&&data.recurrence==='biweekly'&&data.startDate===old.startDate){
+            const upcoming=this.scheduleDates({...old,active:1,endDate:''},today,addDays(today,20))[0];
+            data.startDate=addDays(upcoming,data.weekday-old.weekday);
+            if(data.startDate<today)data.startDate=addDays(data.startDate,14);
+          }else data.startDate=today;
+        }
         if (data.endDate && data.endDate < data.startDate) throw new AppError('La nueva planificación debe terminar después de su fecha de inicio.');
         // Keep the old timetable up to the effective date, including upcoming
         // sessions. Otherwise an edit starting next month erases this month.
@@ -309,7 +328,7 @@ export class Store {
       if (!old.scheduleId) throw new AppError('Esta sesión no tiene una planificación recurrente.');
       const rule = this.get('schedules', old.scheduleId);
       const today = todayIn(this.settings().timezone), time = timeIn(this.settings().timezone);
-      if (rule.recurrence !== 'weekly' || !rule.active || old.originalDate < today || old.date < today || (old.date === today && old.time < time) || date < today || (date === today && data.time < time)) throw new AppError('Para clases ya iniciadas o sin repetición, cambia solo esta sesión.');
+      if (!['weekly','biweekly'].includes(rule.recurrence) || !rule.active || old.originalDate < today || old.date < today || (old.date === today && old.time < time) || date < today || (date === today && data.time < time)) throw new AppError('Para clases ya iniciadas o sin repetición, cambia solo esta sesión.');
       const shift = Math.round((Date.parse(date) - Date.parse(old.originalDate)) / 86400000);
       const cutoff = addDays(old.originalDate, -1);
       const next = { ...scheduleInput({ ...rule, ...data, startDate: date, endDate: rule.endDate ? addDays(rule.endDate, shift) : '', weekday: weekday(date), active: true }), id: randomUUID() };
@@ -459,7 +478,7 @@ export class Store {
   }
   exportData() {
     this.freezePast();
-    return this.transaction(() => ({ app: 'amapola', version: 6, createdAt: new Date().toISOString(), settings: this.settings(),
+    return this.transaction(() => ({ app: 'amapola', version: 7, createdAt: new Date().toISOString(), settings: this.settings(),
       students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions'), busy_blocks: this.all('busy_blocks'),google_sync:this.all('google_sync') }));
   }
   importData(raw) {
@@ -475,7 +494,11 @@ export class Store {
   close() { this.db.close(); }
 }
 export function validateArchive(raw) {
-  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5, 6].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
+  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5, 6, 7].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
+  if(raw.version<7&&Array.isArray(raw.sessions)){
+    raw={...raw,sessions:raw.sessions.map(row=>({...row,id:storedSessionId(row.id)}))};
+    if(Array.isArray(raw.google_sync))raw={...raw,google_sync:raw.google_sync.map(row=>{try{const value=JSON.parse(row.json);return {...row,json:JSON.stringify({...value,...(value.sessionId?{sessionId:storedSessionId(value.sessionId)}:{})})};}catch{return row;}})};
+  }
   const data = { settings: settingsInput(raw.settings), students: [], schedules: [], sessions: [], busy_blocks: [],google_sync:[] };
   try { data.google_sync=syncRows(raw.version>=6?raw.google_sync:[]); } catch { throw new AppError('Datos de sincronización Google no válidos en la copia.'); }
   if(new Set(data.google_sync.map(r=>r.id)).size!==data.google_sync.length)throw new AppError('Datos Google duplicados en la copia.');

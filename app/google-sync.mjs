@@ -54,7 +54,6 @@ export class GoogleSync {
   async init(){
     try {const envelope=JSON.parse(await readFile(this.file,'utf8'));if(envelope.protection==='dpapi'&&process.platform!=='win32')throw Error();this.secrets=JSON.parse(await protect(envelope.value,envelope.protection==='dpapi'));}
     catch(error){if(error.code!=='ENOENT')this.message='Vuelve a conectar Google en Mi información.';}
-    this.periodic=setInterval(()=>{if(this.secrets.refreshToken&&!this.config.paused)this.schedule(0);},120000);this.periodic.unref?.();
   }
   async saveSecrets(){
     const write=async()=>{const value=await protect(JSON.stringify(this.secrets)),temp=this.file+'.tmp';await writeFile(temp,JSON.stringify({protection:process.platform==='win32'?'dpapi':'file-permissions',value}),{mode:0o600});await rename(temp,this.file);};
@@ -63,12 +62,16 @@ export class GoogleSync {
   status(){
     const window=googleWindow(this.store.settings().timezone);
     const events=this.records('event-').filter(r=>r.pending&&!r.dismissed&&r.event.status!=='cancelled'&&(this.config.sourceIds===null||r.calendarId===this.config.calendarId||this.config.sourceIds.includes(r.calendarId))&&eventSegments(r.event,this.store.settings().timezone,window.from,window.to).length);
-    const conflicts=this.records('link-').filter(r=>(r.conflict||r.review)&&this.relevant(r,window));
+    const conflicts=this.records('link-').filter(r=>r.review&&this.relevant(r,window));
     const connected=!!this.secrets.refreshToken;
-    const state=this.busy?'syncing':this.config.paused?'paused':!connected?'disconnected':this.phase==='offline'||this.phase==='error'?this.phase:conflicts.length?'review':this.dirty?'pending':this.phase==='received'?'received':this.config.lastSync?'synced':'pending';
-    return {state,connected,configured:!!this.secrets.clientId,message:this.message,lastSync:this.config.lastSync,lastPull:this.config.lastPull||'',lastPush:this.config.lastPush||'',windowDays:30,pending:this.dirty,calendarId:this.config.calendarId,account:this.config.account,sourceIds:this.config.sourceIds,
-      revision:this.revision,inbox:events.map(r=>({id:r.id,title:r.event.summary||'Sin título',calendarName:r.calendarName,...googleSlot(r.event,this.store.settings().timezone),foreign:r.calendarId!==this.config.calendarId})),
-      reviews:conflicts.map(r=>({key:r.key,sessionId:r.sessionId,title:this.findLocal(r)?.title||r.remote?.summary||'Clase',message:r.conflict||r.review,conflict:!!r.conflict}))};
+    const state=this.busy?'syncing':this.config.paused?'paused':!connected?'disconnected':this.phase==='offline'||this.phase==='error'?this.phase:conflicts.length?'review':this.dirty?'pending':this.phase==='received'?'received':this.phase==='sent'||this.config.lastPush?'sent':'pending';
+    const calendars=new Map((this.config.calendars||[]).map(c=>[c.id,c]));
+    for(const record of this.records('event-'))if(!calendars.has(record.calendarId))calendars.set(record.calendarId,{id:record.calendarId,title:record.calendarName||record.calendarId});
+    return {state,connected,paused:!!this.config.paused,configured:!!this.secrets.clientId,message:this.message,lastSync:this.config.lastSync,lastPull:this.config.lastPull||'',lastPush:this.config.lastPush||'',windowDays:30,pending:this.dirty,calendarId:this.config.calendarId,account:this.config.account,sourceIds:this.config.sourceIds,
+      operation:this.operation||null,online:this.online??null,connectionIssue:this.connectionIssue||'',lastPullError:this.lastPullError||'',lastPushError:this.lastPushError||'',hiddenCalendarIds:this.config.hiddenCalendarIds||[],calendars:[...calendars.values()],
+      classLinks:this.records('link-').filter(link=>this.relevant(link,window)).map(link=>({key:link.key,sessionId:link.sessionId,linked:!!link.etag,gone:!!link.gone,calendarName:calendars.get(this.config.calendarId)?.title||'Amapola'})),
+      revision:this.revision,inbox:events.map(r=>({id:r.id,title:r.event.summary||'Sin título',calendarId:r.calendarId,calendarName:r.calendarName,...googleSlot(r.event,this.store.settings().timezone),foreign:r.calendarId!==this.config.calendarId})),
+      reviews:conflicts.map(r=>({key:r.key,sessionId:r.sessionId,title:this.findLocal(r)?.title||r.remote?.summary||'Clase',message:r.review,conflict:false}))};
   }
   async configure(value){
     const client=value?.installed;
@@ -103,7 +106,7 @@ export class GoogleSync {
     if(!this.secrets.refreshToken)throw new AppError('Google no facilitó acceso permanente. Vuelve a conectar y autoriza el acceso.');
     await this.saveSecrets();this.saveConfig();this.dirty=true;
     if(this.config.paused)this.message='Google conectado. Revisa los agendas y pulsa Reanudar.';
-    else this.schedule(0);
+    else this.message='Google conectado. Actualiza para recibir sus eventos.';
   }
   async accessToken(){
     if(!this.secrets.refreshToken)throw new AppError('Conecta Google en Mi información.',401);
@@ -132,23 +135,30 @@ export class GoogleSync {
     }
     throw new AppError('Demasiados eventos para sincronizar. Selecciona menos agendas.',502);
   }
-  async calendars(){return (await this.pages('/users/me/calendarList?maxResults=250')).filter(c=>['owner','writer','reader'].includes(c.accessRole)).map(c=>({id:c.id,title:c.summaryOverride||c.summary||c.id,primary:!!c.primary,owned:c.id===this.config.calendarId}));}
+  async calendars(){const calendars=(await this.pages('/users/me/calendarList?maxResults=250')).filter(c=>['owner','writer','reader'].includes(c.accessRole)).map(c=>({id:c.id,title:String(c.summaryOverride||c.summary||c.id).slice(0,2000),primary:!!c.primary,owned:c.id===this.config.calendarId}));this.config.calendars=calendars.map(({id,title})=>({id,title}));this.saveConfig();return calendars;}
+  async checkConnection(){
+    if(this.busy)return this.status();
+    if(!this.secrets.refreshToken){this.online=false;this.connectionIssue='Google no está conectado. Los agendas no se han actualizado.';return this.status();}
+    try{await this.calendars();this.online=true;this.connectionIssue='';if(this.phase==='offline')this.phase=this.config.lastPull?'received':'pending';}
+    catch(error){this.online=false;this.connectionIssue=error instanceof AppError?error.message:'No se puede conectar con Google.';}
+    return this.status();
+  }
+  setVisibility(ids){if(!Array.isArray(ids)||ids.length>1000||ids.some(id=>!googleId(id)))throw new AppError('Agendas ocultos no válidos.');this.config.hiddenCalendarIds=[...new Set(ids)];this.saveConfig();return this.status();}
   async selectCalendars(ids){
     const calendars=await this.calendars(),allowed=new Set(calendars.map(c=>c.id));
     if(!Array.isArray(ids)||ids.length>1000||ids.some(id=>!allowed.has(id)))throw new AppError('Selecciona agendas accesibles.');
     this.config.sourceIds=[...new Set([...ids,this.config.calendarId].filter(Boolean))];this.saveConfig();this.touch();return this.status();
   }
-  touch(){this.dirty=true;this.schedule(1600);}
-  schedule(delay=0){clearTimeout(this.timer);if(this.closed||this.config.paused||!this.secrets.refreshToken)return;this.timer=setTimeout(()=>this.run(),delay);this.timer.unref?.();}
-  async run(direction='both'){
-    if(!['both','pull','push'].includes(direction))throw new AppError('Dirección de sincronización no válida.');
+  touch(){this.dirty=true;}
+  async run(direction='pull'){
+    if(!['pull','push'].includes(direction))throw new AppError('Dirección de sincronización no válida.');
     if(this.closed||this.busy||this.config.paused||!this.secrets.refreshToken)return this.status();
-    clearTimeout(this.timer);this.busy=true;this.abort=new AbortController();this.message='Importando Google antes de enviar los cambios…';
+    this.busy=true;this.abort=new AbortController();this.message=direction==='pull'?'Recibiendo de Google…':'Enviando Amapola a Google…';
+    this.operation={id:randomUUID(),direction,done:0,total:0,stage:this.message,ok:null,error:''};
     this.running=this.cycle(direction);
-    try {await this.running;this.phase=direction==='pull'?'received':'synced';this.message=direction==='pull'?(this.dirty?'Google recibido. Hay cambios locales pendientes de enviar.':'Datos recibidos de Google. No se han enviado cambios.'):(this.dirty?'Enviando los cambios restantes…':'Sincronizado con Google · Próximos 30 días');}
-    catch(error){this.dirty=true;this.phase=error.status===503?'offline':error.status===401?'disconnected':'error';this.message=error instanceof AppError?error.message:'No se pudo sincronizar. Los datos locales se conservan.';}
+    try {await this.running;this.phase=direction==='pull'?'received':'sent';this.message=direction==='pull'?(this.dirty?'Google recibido. Hay cambios locales pendientes de enviar.':'Datos recibidos de Google.'):'Agenda Amapola enviada a Google.';this.operation.ok=true;this.online=true;this.connectionIssue='';if(direction==='pull')this.lastPullError='';else this.lastPushError='';}
+    catch(error){this.dirty=true;this.phase=error.status===503?'offline':error.status===401?'disconnected':'error';this.message=error instanceof AppError?error.message:'No se pudo sincronizar. Los datos locales se conservan.';this.operation.ok=false;this.operation.error=this.message;if(direction==='pull')this.lastPullError=this.message;else this.lastPushError=this.message;if(error.status===503||error.status===401){this.online=false;this.connectionIssue=this.message;}}
     finally{this.busy=false;this.abort=null;this.running=null;}
-    if(direction!=='pull'&&this.dirty&&this.phase==='synced')this.schedule(1000);
     return this.status();
   }
   async ensureCalendar(calendars,{create=true}={}){
@@ -172,122 +182,125 @@ export class GoogleSync {
     const local=this.findLocal(link);
     return !!(local&&local.date>=window.from&&local.date<=window.to)||!!(link.remote&&eventSegments(link.remote,this.store.settings().timezone,window.from,window.to).length);
   }
-  updateFromGoogle(link,event,force=false){
-    const local=this.findLocal(link),changed=force||event.etag!==link.etag;
-    link.remote=simpleEvent(event);
-    if(!changed)return;
-    if(event.status==='cancelled'||event.http===404||event.http===410){
-      if(local&&!local.isDeleted){const saved=this.store.persistSession(local,{status:'cancelled',isOverride:1});link.sessionId=saved.id;link.baseHash=fingerprint(saved);}
-      link.gone=true;link.etag=event.etag||link.etag;return;
+  saveGoogleClass(link,event) {
+    let local=this.findLocal(link);
+    const removed=event.status==='cancelled'||event.http===404||event.http===410;
+    link.remote=simpleEvent({...link.remote,...event});link.conflict='';link.review='';
+    if(!local){
+      if(!removed){this.write(eventId(this.config.calendarId,event.id),{calendarId:this.config.calendarId,calendarName:this.config.calendars?.find(c=>c.id===this.config.calendarId)?.title||'Amapola',event:simpleEvent(event),pending:true,dismissed:false,linkKey:''});this.store.db.prepare('DELETE FROM google_sync WHERE id=?').run(linkId(link.key));}
+      else {link.gone=true;link.etag=event.etag||link.etag;this.write(linkId(link.key),link);}
+      return;
     }
-    if(!local||local.isDeleted){link.conflict='Google cambió esta clase después de su eliminación local. Elige qué conservar.';link.etag=event.etag;return;}
-    const slot=googleSlot(event,this.store.settings().timezone);
-    if(!slot){link.review='El horario Google ocupa varios días o no corresponde a una clase de 5 a 720 minutos. Corrígelo en Google y sincroniza.';link.etag=event.etag;return;}
-    if(local){if(local.status==='cancelled')slot.title=slot.title.replace(/^\[Cancelada\] /,'');const saved=this.store.persistSession(local,{...slot,isOverride:1});link.sessionId=saved.id;link.baseHash=fingerprint(saved);}
-    link.review=(Number(slot.time.slice(3))%15||slot.duration%15)?'Horario Google fuera de intervalos de 15 minutos. Abre la clase para corregirlo.':'';
-    link.gone=false;link.etag=event.etag;link.conflict='';
+    // Virtual occurrence IDs contain @; only UUIDs may be stored in session archives.
+    if(local.virtual)local={...local,id:randomUUID()};
+    if(removed){
+      const saved=this.store.persistSession(local,{status:'cancelled',isDeleted:0,isOverride:1});link.sessionId=saved.id;link.baseHash=fingerprint(saved);link.gone=true;
+    } else {
+      const slot=googleSlot(event,this.store.settings().timezone);
+      if(!slot){link.review='Revisa en Google este horario de varios días o fuera de la duración de una clase.';link.etag=event.etag;this.write(linkId(link.key),link);return;}
+      const remoteStatus=event.extendedProperties?.private?.amapolaStatus;
+      const status=['planned','confirmed','completed','cancelled'].includes(remoteStatus)?remoteStatus:local.isDeleted||local.status==='cancelled'?'planned':local.status;
+      if(status==='cancelled')slot.title=slot.title.replace(/^\[Cancelada\] /,'');
+      const saved=this.store.persistSession(local,{...slot,status,isDeleted:0,isOverride:1});link.sessionId=saved.id;link.baseHash=fingerprint(saved);link.gone=false;
+      if(Number(slot.time.slice(3))%15||slot.duration%15)link.review='Horario Google fuera de intervalos de 15 minutos. Puedes corregirlo en la clase.';
+    }
+    link.etag=event.etag||link.etag;this.write(linkId(link.key),link);
   }
-  importEvent(calendar,event){
-    const own=calendar.id===this.config.calendarId;
-    let link=own?(this.importLinkIndex?.get(event.id)||this.records('link-').find(l=>l.googleId===event.id)):null;
-    const privateData=event.extendedProperties?.private||{};
+  receiveEvent(calendar,event,links) {
+    const own=calendar.id===this.config.calendarId,privateData=event.extendedProperties?.private||{};
+    let link=own?links.get(event.id):null;
     if(!link&&own&&privateData.amapolaWorkspace===this.config.namespace&&googleId(privateData.amapolaClass)){
       const candidate={key:privateData.amapolaClass,googleId:event.id,etag:'',baseHash:''};
       if(this.findLocal(candidate))link=candidate;
     }
-    if(link){this.updateFromGoogle(link,event);const {id,...value}=link;this.write(linkId(link.key),value);return;}
-    const id=eventId(calendar.id,event.id),old=this.read(id);
-    if(old?.linkKey){
-      const related=this.read(linkId(old.linkKey));
-      if(related&&event.etag!==old.event.etag){
-        const local=this.findLocal(related);
-        if(local&&!local.isDeleted){
-          if(event.status==='cancelled')this.store.persistSession(local,{status:'cancelled',isOverride:1});
-          else {const slot=googleSlot(event,this.store.settings().timezone);if(slot)this.store.persistSession(local,{...slot,isOverride:1});else related.review='Revisa el horario del evento original Google.';}
-        }
-        this.write(linkId(related.key),related);
-      }
-    }
-    this.write(id,{calendarId:calendar.id,calendarName:calendar.title,event:simpleEvent({...old?.event,...event}),pending:old?.pending??/^\s*Amapola\b/i.test(event.description||''),dismissed:old?.dismissed||event.status==='cancelled',linkKey:old?.linkKey||''});
+    if(link){this.saveGoogleClass(link,event);return;}
+    const id=eventId(calendar.id,event.id),old=this.read(id),removed=event.status==='cancelled';
+    this.write(id,{calendarId:calendar.id,calendarName:calendar.title,event:simpleEvent({...old?.event,...event}),pending:old?.pending??(own||/^\s*Amapola\b/i.test(event.description||'')),dismissed:removed,linkKey:old?.linkKey||''});
   }
-  async cycle(direction='both'){
-    let calendars=await this.calendars();await this.ensureCalendar(calendars,{create:direction!=='pull'});
-    if(this.config.calendarId&&!calendars.some(c=>c.id===this.config.calendarId))calendars.push({id:this.config.calendarId,title:'Amapola',owned:true});
-    const selected=calendars.filter(c=>c.owned||c.id===this.config.calendarId||this.config.sourceIds===null||this.config.sourceIds.includes(c.id));
-    if(this.config.sourceIds?.some(id=>!selected.some(c=>c.id===id)))throw new AppError('Un agenda seleccionado ya no es accesible. Revisa la selección antes de sincronizar.');
-    const zone=this.store.settings().timezone,window=googleWindow(zone),{from,to}=window,snapshots=[];
-    for(const calendar of selected){const query=new URLSearchParams({singleEvents:'true',showDeleted:'true',maxResults:'1000',timeMin:utcInstant(from,'00:00',zone),timeMax:utcInstant(window.end,'00:00',zone)});snapshots.push({calendar,events:await this.pages(`/calendars/${encodeURIComponent(calendar.id)}/events?${query}`)});}
-    // Missing from a bounded/paginated list is never sufficient evidence of deletion.
-    const missing=[],links=this.records('link-'),linked=new Map(links.map(link=>[link.googleId,link]));
-    for(const snapshot of snapshots)snapshot.events=snapshot.events.filter(event=>{
-      if(eventSegments(event,zone,from,to).length)return true;
-      const link=snapshot.calendar.id===this.config.calendarId?linked.get(event.id):null;
-      if(link&&this.relevant(link,window))return true;
-      const previous=this.read(eventId(snapshot.calendar.id,event.id));
-      return !!previous&&!!eventSegments(previous.event,zone,from,to).length;
-    });
-    for(const link of links)if(link.etag&&!link.gone&&this.relevant(link,window)&&!snapshots.find(s=>s.calendar.id===this.config.calendarId)?.events.some(e=>e.id===link.googleId))missing.push({calendar:{id:this.config.calendarId,title:'Amapola'},id:link.googleId});
-    for(const record of this.records('event-'))if(!record.dismissed&&eventSegments(record.event,zone,from,to).length&&selected.some(c=>c.id===record.calendarId)&&!snapshots.find(s=>s.calendar.id===record.calendarId)?.events.some(e=>e.id===record.event.id))missing.push({calendar:selected.find(c=>c.id===record.calendarId),id:record.event.id});
-    const fetchedMissing=[];
-    for(const item of missing){const event=await this.request(`/calendars/${encodeURIComponent(item.calendar.id)}/events/${encodeURIComponent(item.id)}`);if(event.http&&![404,410].includes(event.http))throw new AppError('Google no confirmó el estado de un evento. No se ha supuesto su eliminación.',502);fetchedMissing.push({...item,event:event.http?{id:item.id,status:'cancelled',etag:'gone'}:event});}
-    const allIncoming=[...snapshots.flatMap(s=>s.events.map(event=>({calendar:s.calendar,event}))),...fetchedMissing];
-    const changedRemote=allIncoming.some(({calendar,event})=>{const old=calendar.id===this.config.calendarId?linked.get(event.id):null;return old?old.etag!==event.etag:this.read(eventId(calendar.id,event.id))?.event.etag!==event.etag;});
-    if(this.backups&&allIncoming.some(({calendar,event})=>calendar.id===this.config.calendarId&&linked.has(event.id)&&linked.get(event.id).etag!==event.etag))await this.backups.beforeGoogleSync();
-    this.importLinkIndex=new Map(this.records('link-').map(link=>[link.googleId,link]));
-    try { this.store.transaction(()=>{
-      // Personal agendas first; changes made directly in the Amapola agenda take priority.
-      snapshots.sort((a,b)=>Number(a.calendar.id===this.config.calendarId)-Number(b.calendar.id===this.config.calendarId));
-      for(const {calendar,events} of snapshots)for(const event of events)this.importEvent(calendar,event);
-      for(const {calendar,event} of fetchedMissing)this.importEvent(calendar,event);
-    }); } finally {this.importLinkIndex=null;}
-    if(changedRemote)this.revision++;this.message='Google importado. Enviando cambios de Amapola…';
-    const inventory=this.store.occurrences(from,to);
-    const known=this.records('link-'),knownKeys=new Set(known.map(link=>link.key)),knownSessions=new Set(known.map(link=>link.sessionId).filter(Boolean));
-    if(direction==='pull'){
-      this.dirty=inventory.some(row=>!knownKeys.has(keyOf(row))&&!knownSessions.has(row.id))||known.some(link=>this.relevant(link,window)&&(fingerprint(this.findLocal(link))!==link.baseHash||infoHash(this.findLocal(link))!==link.infoHash));
-      this.config.lastPull=new Date().toISOString();this.saveConfig();this.backups?.schedule();return;
+  hasLocalChanges(window) {
+    const links=this.records('link-'),keys=new Set(links.map(l=>l.key)),sessions=new Set(links.map(l=>l.sessionId).filter(Boolean));
+    return this.store.occurrences(window.from,window.to).some(row=>!keys.has(keyOf(row))&&!sessions.has(row.id))||links.some(link=>this.relevant(link,window)&&(fingerprint(this.findLocal(link))!==link.baseHash||infoHash(this.findLocal(link))!==link.infoHash));
+  }
+  async receive() {
+    const calendars=await this.calendars();await this.ensureCalendar(calendars,{create:false});
+    if(this.config.calendarId&&!calendars.some(c=>c.id===this.config.calendarId))calendars.push({id:this.config.calendarId,title:'Amapola'});
+    const selected=calendars.filter(c=>c.id===this.config.calendarId||this.config.sourceIds===null||this.config.sourceIds.includes(c.id));
+    if(this.config.sourceIds?.some(id=>!selected.some(c=>c.id===id)))throw new AppError('Un agenda seleccionado ya no es accesible. Revisa la selección.');
+    const zone=this.store.settings().timezone,window=googleWindow(zone),{from,to}=window;
+    const links=this.records('link-'),index=new Map(links.map(link=>[link.googleId,link])),incoming=[];
+    this.operation.total=selected.length;this.operation.stage='Descargando los agendas seleccionados…';
+    for(const calendar of selected){
+      const query=new URLSearchParams({singleEvents:'true',showDeleted:'true',maxResults:'1000',timeMin:utcInstant(from,'00:00',zone),timeMax:utcInstant(window.end,'00:00',zone)});
+      const events=await this.pages(`/calendars/${encodeURIComponent(calendar.id)}/events?${query}`);
+      for(const event of events){
+        const linked=calendar.id===this.config.calendarId?index.get(event.id):null,old=this.read(eventId(calendar.id,event.id));
+        if(eventSegments(event,zone,from,to).length||(linked&&this.relevant(linked,window))||(old&&eventSegments(old.event,zone,from,to).length))incoming.push({calendar,event});
+      }
+      this.operation.done++;
     }
-    for(const row of inventory){
-      if(knownSessions.has(row.id)||knownKeys.has(keyOf(row)))continue;
+    const missing=[];
+    for(const link of links)if(link.etag&&this.relevant(link,window)&&!incoming.some(r=>r.calendar.id===this.config.calendarId&&r.event.id===link.googleId))missing.push({calendar:{id:this.config.calendarId,title:'Amapola'},id:link.googleId});
+    for(const record of this.records('event-'))if(!record.dismissed&&!(record.linkKey&&!record.pending&&record.calendarId===this.config.calendarId)&&selected.some(c=>c.id===record.calendarId)&&eventSegments(record.event,zone,from,to).length&&!incoming.some(r=>r.calendar.id===record.calendarId&&r.event.id===record.event.id)&&!missing.some(r=>r.calendar.id===record.calendarId&&r.id===record.event.id))missing.push({calendar:selected.find(c=>c.id===record.calendarId),id:record.event.id});
+    this.operation.total+=missing.length;
+    for(const item of missing){
+      const result=await this.request(`/calendars/${encodeURIComponent(item.calendar.id)}/events/${encodeURIComponent(item.id)}`);
+      if(result.http&&![404,410].includes(result.http))throw new AppError('Google no confirmó el estado del evento. No se ha supuesto su eliminación.',502);
+      incoming.push({calendar:item.calendar,event:result.http?{id:item.id,status:'cancelled',etag:'gone'}:result});this.operation.done++;
+    }
+    // No domain changes until every selected agenda and missing event has been read successfully.
+    if(this.backups&&incoming.some(r=>r.calendar.id===this.config.calendarId&&index.has(r.event.id)))await this.backups.beforeGoogleSync();
+    this.operation.stage='Aplicando Google a Amapola…';
+    this.store.transaction(()=>{
+      incoming.sort((a,b)=>Number(a.calendar.id===this.config.calendarId)-Number(b.calendar.id===this.config.calendarId));
+      for(const {calendar,event} of incoming)this.receiveEvent(calendar,event,index);
+    });
+    this.revision++;this.dirty=this.hasLocalChanges(window);this.config.lastPull=new Date().toISOString();this.saveConfig();this.backups?.schedule();
+  }
+  async send() {
+    // Account/calendar metadata may be checked; event contents are never imported by an upload.
+    await this.ensureCalendar(await this.calendars());
+    const window=googleWindow(this.store.settings().timezone),inventory=this.store.occurrences(window.from,window.to),known=this.records('link-');
+    const keys=new Set(known.map(l=>l.key)),sessions=new Set(known.map(l=>l.sessionId).filter(Boolean));
+    for(const row of inventory)if(!keys.has(keyOf(row))&&!sessions.has(row.id)){
       const key=keyOf(row);this.write(linkId(key),{key,sessionId:row.virtual?'':row.id,googleId:'amapola'+hash(this.config.namespace+'\n'+key),etag:'',baseHash:'',gone:false,review:'',conflict:''});
     }
-    this.dirty=false;let sent=0;
-    for(const {id,...link} of this.records('link-')){
-      if(!this.relevant(link,window))continue;
-      const local=this.findLocal(link),changed=fingerprint(local)!==link.baseHash||infoHash(local)!==link.infoHash;
-      if(link.review&&changed&&local&&!local.isDeleted&&Number(local.time.slice(3))%15===0&&local.duration%15===0){link.review='';this.write(id,link);}
-      if(link.conflict||link.review)continue;
-      if(!changed)continue;
-      if(sent>=25){this.dirty=true;continue;}
-      if((!local||local.isDeleted)&&!link.etag){link.baseHash=fingerprint(local);link.infoHash=infoHash(local);this.write(id,link);continue;}
-      if((!local||local.isDeleted)&&link.gone){link.baseHash=fingerprint(local);link.infoHash=infoHash(local);this.write(id,link);continue;}
-      if(link.gone&&local?.status==='cancelled'){link.baseHash=fingerprint(local);link.infoHash=infoHash(local);this.write(id,link);continue;}
-      sent++;
-      const route=`/calendars/${encodeURIComponent(this.config.calendarId)}/events`;
+    const links=this.records('link-').filter(link=>this.relevant(link,window));
+    this.operation.total=links.length;this.operation.stage='Enviando las clases Amapola…';
+    const route=`/calendars/${encodeURIComponent(this.config.calendarId)}/events`;
+    for(const {id,...link} of links){
+      const local=this.findLocal(link);
       if(!local||local.isDeleted){
-        const response=await this.request(route+'/'+encodeURIComponent(link.googleId),{method:'DELETE',etag:link.etag});
-        if(response.http===412){link.conflict='Google cambió durante la eliminación. Sincroniza y revisa antes de borrar.';this.write(id,link);continue;}
-        link.gone=true;link.baseHash=fingerprint(local);link.infoHash=infoHash(local);this.write(id,link);continue;
+        const result=await this.request(route+'/'+encodeURIComponent(link.googleId),{method:'DELETE'});if(result.http&&![404,410].includes(result.http))throw new AppError('Google no confirmó la eliminación. Vuelve a enviar.',502);
+        link.gone=true;
+      } else {
+        const body=this.eventBody(local,link.key);
+        let result=await this.request(route+'/'+encodeURIComponent(link.googleId),{method:'PATCH',body});
+        if(result.http===404||result.http===410||result.status==='cancelled'){
+          if(link.etag||link.gone){link.googleId='amapola'+randomUUID().replaceAll('-','');link.etag='';link.gone=false;this.write(id,link);}
+          result=await this.request(route,{method:'POST',body:{...body,id:link.googleId}});
+          if(result.http===409){
+            const existing=await this.request(route+'/'+encodeURIComponent(link.googleId));
+            if(existing.extendedProperties?.private?.amapolaWorkspace!==this.config.namespace||existing.extendedProperties?.private?.amapolaClass!==link.key)throw new AppError('El identificador Google pertenece a otro evento. No se ha sobrescrito.',409);
+            result=await this.request(route+'/'+encodeURIComponent(link.googleId),{method:'PATCH',body});
+          }
+        }
+        if(!result.etag)throw new AppError('Google no confirmó el guardado. Vuelve a enviar; no se creará un duplicado.',502);
+        link.etag=result.etag;link.remote=simpleEvent(result);link.gone=false;
       }
-      if(link.gone){link.googleId='amapola'+randomUUID().replaceAll('-','');link.etag='';link.gone=false;this.write(id,link);}
-      const body=this.eventBody(local,link.key);
-      let response=link.etag?await this.request(route+'/'+encodeURIComponent(link.googleId),{method:'PATCH',etag:link.etag,body}):await this.request(route,{method:'POST',body:{...body,id:link.googleId}});
-      if(response.http===409){response=await this.request(route+'/'+encodeURIComponent(link.googleId));if(response.extendedProperties?.private?.amapolaWorkspace!==this.config.namespace||response.extendedProperties?.private?.amapolaClass!==link.key)throw new AppError('Identificador Google ya utilizado. No se ha creado un duplicado.',409);this.updateFromGoogle(link,response,true);}
-      else if(response.http===412){this.dirty=true;continue;}
-      else if(response.http===404||response.http===410){this.updateFromGoogle(link,{status:'cancelled'},true);this.write(id,link);continue;}
-      else if(!response.etag)throw new AppError('Google no confirmó el guardado. Se comprobará antes de reintentar.',502);
-      link.etag=response.etag;link.baseHash=fingerprint(this.findLocal(link));link.infoHash=infoHash(this.findLocal(link));link.remote=simpleEvent(response);this.write(id,link);
+      link.baseHash=fingerprint(local);link.infoHash=infoHash(local);link.conflict='';link.review='';this.write(id,link);this.operation.done++;
     }
-    this.config.lastSync=new Date().toISOString();this.config.lastPull=this.config.lastSync;this.config.lastPush=this.config.lastSync;this.saveConfig();this.backups?.schedule();
+    this.config.lastPush=new Date().toISOString();this.dirty=false;this.saveConfig();this.backups?.schedule();
   }
+  async cycle(direction){return direction==='pull'?this.receive():this.send();}
+
   eventBody(row,key){
     const zone=this.store.settings().timezone,minutes=Number(row.time.slice(0,2))*60+Number(row.time.slice(3))+row.duration;
     const end=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
     const student=this.store.get('students',row.studentId),paid=row.paymentStatus==='paid';
-    return {summary:(row.status==='cancelled'?'[Cancelada] ':'')+row.title,
+    return {status:'confirmed',summary:(row.status==='cancelled'?'[Cancelada] ':'')+row.title,
       description:`Amapola\nAlumno: ${student.firstName} ${student.lastName}\nTarifa: ${(row.price/100).toFixed(2)} ${this.store.settings().currency}\nPago: ${paid?'Pagada':'Pendiente'}${row.paymentMethod?' · '+row.paymentMethod:''}\nModalidad: ${row.modality}\nEstado: ${row.status}\n\nInformación de referencia. Alumno, tarifa y pago se modifican en Amapola.`,
       start:{dateTime:utcInstant(row.date,row.time,zone),timeZone:zone},end:{dateTime:utcInstant(row.date,end,zone),timeZone:zone},
-      transparency:row.status==='cancelled'?'transparent':'opaque',extendedProperties:{private:{amapolaWorkspace:this.config.namespace,amapolaClass:key}}};
+      transparency:row.status==='cancelled'?'transparent':'opaque',extendedProperties:{private:{amapolaWorkspace:this.config.namespace,amapolaClass:key,amapolaStatus:row.status}}};
   }
   complete(id,value){
     const record=this.read(id);if(!record||!record.pending||record.dismissed||record.event.status==='cancelled')throw new AppError('Esta clase Google ya no está pendiente.',409);
@@ -299,18 +312,8 @@ export class GoogleSync {
       this.write(id,{...record,pending:false,linkKey:row.id});this.touch();return row;
     });
   }
-  resolve(key,choice){
-    const link=this.read(linkId(key));if(!link?.conflict)throw new AppError('No hay conflicto pendiente.');
-    if(choice==='google'){
-      const local=this.findLocal(link);
-      if(!local){this.write(eventId(this.config.calendarId,link.googleId),{calendarId:this.config.calendarId,calendarName:'Amapola',event:link.remote,pending:true,dismissed:false,linkKey:''});this.store.db.prepare('DELETE FROM google_sync WHERE id=?').run(linkId(key));this.touch();return;}
-      if(local.isDeleted)this.store.persistSession(local,{isDeleted:0});
-      this.updateFromGoogle(link,link.remote,true);
-    }else if(choice!=='amapola')throw new AppError('Elige qué versión conservar.');
-    link.conflict='';this.write(linkId(key),link);this.touch();
-  }
   pauseAfterRestore(){this.config=this.read('config')||{namespace:randomUUID(),account:'',calendarId:'',sourceIds:null,lastSync:''};this.config.paused=true;this.saveConfig();this.message='Copia restaurada. Revisa los agendas y pulsa Reanudar.';clearTimeout(this.timer);}
-  resume(){if(!this.secrets.refreshToken)throw new AppError('Conecta Google antes de reanudar la sincronización.',401);this.config.paused=false;this.saveConfig();this.dirty=true;this.schedule(0);}
+  resume(){if(!this.secrets.refreshToken)throw new AppError('Conecta Google antes de reanudar la sincronización.',401);this.config.paused=false;this.saveConfig();this.dirty=true;this.message='Reanudado. Elige Actualizar o Enviar.';}
   async disconnect(){
     clearTimeout(this.timer);this.abort?.abort();await this.running?.catch(()=>{});
     const token=this.secrets.refreshToken;this.secrets={clientId:this.secrets.clientId,clientSecret:this.secrets.clientSecret};await this.saveSecrets();this.phase='disconnected';this.message='Google desconectado. Los datos locales se conservan.';
