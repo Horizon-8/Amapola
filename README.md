@@ -8,7 +8,7 @@ En Google los eventos se llaman Clase con Ana y conservan [Cancelada] cuando cor
 
 Base y copias v8, con lectura de archivos v1-v7. Antes de migrar se conserva una copia en el formato anterior. La versión 0.5.x usa la misma carpeta de datos que la actual: en el mismo PC, actualizar los archivos del programa conserva los datos locales. En otro PC, restaura una copia .amapola. Exporta una copia antes de actualizar y conserva la anterior; una versión antigua no puede abrir la base ya migrada. No basta con copiar el ejecutable: la actualización portátil incluye app, runtime y los demás archivos.
 
-Esta versión es para pruebas locales. No se ha publicado en GitHub ni se ha creado un ZIP nuevo; se hará después de revisar los cambios.
+Descarga **Amapola-0.9.0-Windows.zip** desde [Releases](https://github.com/Horizon-8/Amapola/releases/latest), extrae **todo** el contenido en una carpeta permanente y abre **Amapola.exe**. No necesitas instalar Node.js ni descargar el archivo «Source code». El paquete no contiene datos personales ni credenciales. Consulta **INSTALLATION-FR.md** para actualizar o trasladar los datos y **RELEASE-NOTES.md** para las novedades de esta entrega.
 
 
 ## Versión 0.8.1 - botones rosados, aviso al cerrar pestaña e interfaz modular

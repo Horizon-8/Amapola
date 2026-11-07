@@ -1,43 +1,29 @@
-# Historial de versiones y copia del código
+# Código, versiones y descargas
 
-El proyecto tiene un historial Git local preparado con las versiones **v0.4.1**, **v0.5.0** y **v0.5.1**. Las bases de datos, copias `.amapola`, credenciales, archivos temporales, ejecutables y ZIP están excluidos. Los ejemplos que aparecen en los tests son datos sintéticos que solo se crean al ejecutar esos tests.
+Repositorio: [Horizon-8/Amapola](https://github.com/Horizon-8/Amapola).
 
-## Primera publicación
+## Descargar la aplicación
 
-La cuenta conectada es **Horizon-8**. El conector disponible permite trabajar con repositorios existentes, pero no crear uno nuevo. Para terminar la publicación:
+Abre [Releases](https://github.com/Horizon-8/Amapola/releases/latest) y descarga **Amapola-0.9.0-Windows.zip** en **Assets**. Extrae todo y abre **Amapola.exe**. Los archivos «Source code (zip/tar.gz)» no incluyen el motor ni el ejecutable preparado.
 
-1. Abre `https://github.com/new` con tu cuenta.
-2. Crea un repositorio llamado **Amapola**, con visibilidad **Private**. Déjalo vacío, sin añadir README, licencia ni `.gitignore`, porque ya forman parte del proyecto.
-3. Abre el repositorio que acabas de crear y copia la URL del navegador, por ejemplo `https://github.com/Horizon-8/Amapola`. También sirve **Code → HTTPS → copiar**, que termina en `.git`. Facilita esa URL para enviar el código desde la conversación, o ejecuta en PowerShell, desde esta carpeta de trabajo del proyecto (donde está el historial preparado):
+Cada release conserva su versión del programa. El archivo `.sha256` permite comprobar la integridad de su ZIP con `Get-FileHash` en PowerShell. Las instrucciones de instalación, actualización y traslado están en **INSTALLATION-FR.md** y **GUIA-COPIAS.md**.
 
-```powershell
-.\windows\Publicar-GitHub.ps1 -RepositoryUrl 'https://github.com/Horizon-8/Amapola.git'
-```
+## Qué guarda GitHub
 
-Git puede pedir que inicies sesión en GitHub. No introduzcas tokens en los archivos del proyecto ni en la URL del repositorio.
+El historial contiene las fuentes, pruebas y guías. Se excluyen bases de datos, copias `.amapola`, datos personales, credenciales Google y registros. El ZIP portable lleva el motor Node.js y el ejecutable, pero tampoco contiene datos de usuario.
 
-El entorno de trabajo automatizado protege el índice de `.git`. Por eso los commits preparados están en `.local/version-history.git`. El script de publicación importa ese historial al repositorio normal, sin reemplazar tus archivos de trabajo, antes de enviarlo. Tras ejecutar el script desde PowerShell en tu PC, podrás usar los comandos Git habituales siguientes.
+Los cambios de alumnos, clases o pagos no son commits: se guardan en el PC y se protegen exportando copias `.amapola`. Descargar una release no recupera esos datos por sí solo.
 
-## Guardar cambios posteriores
+La visibilidad del repositorio determina quién puede acceder al código y a sus releases. Un repositorio público se puede encontrar y descargar sin iniciar sesión ; no es un enlace privado. No publiques datos ni credenciales aunque solo compartas la URL con conocidos.
 
-En la carpeta del proyecto:
+## Desarrollo y publicación
+
+Para trabajar con el historial remoto, clona el repositorio en una carpeta de desarrollo nueva. No fuerces el envío de un historial local distinto sobre `main`.
 
 ```powershell
-git status
-git add app tests windows package.json README.md TESTS-UI.md GUIA-COPIAS.md INSTALLATION-FR.md LEEME.html GITHUB.md .gitignore .gitattributes
-git diff --cached --stat
-git commit -m "Describe aquí el cambio"
-git push
+git clone https://github.com/Horizon-8/Amapola.git
 ```
 
-Un commit local conserva una versión en este PC; `git push` envía esa versión a GitHub. Si utilizas la aplicación sin modificar el código, no hace falta crear commits por cada clase o pago: esos cambios se guardan con las copias `.amapola`.
+El motor Node.js 24.13 o posterior de la rama 24.x y su licencia completa se colocan en `runtime`, fuera del historial. `windows/build.ps1` compila el lanzador y crea el ZIP con una lista explícita de archivos permitidos. Las pruebas se ejecutan con `runtime\node.exe --test`.
 
-## Recuperar el programa
-
-Puedes recuperar las fuentes con `git clone` desde tu repositorio privado. El motor Node.js y los ejecutables generados se obtienen o reconstruyen por separado, siguiendo README.md y windows/build.ps1. Para usar la aplicación en otro PC, el ZIP portátil sigue siendo la opción directa; después restaura tu copia de datos `.amapola` si quieres recuperarlos.
-
-En la conversación anterior se entregó un respaldo del historial hasta 0.5.0, `Amapola-0.5.0-source.bundle`. Contiene esas fuentes y commits, sin datos personales ni el motor Node.js. Puedes guardarlo fuera de este PC mientras se completa la publicación en GitHub. El ZIP actual incluye las fuentes actualizadas a 0.5.1, pero ese respaldo anterior corresponde a 0.5.0. Para recuperar las fuentes desde ese archivo:
-
-```powershell
-git clone Amapola-0.5.0-source.bundle Amapola
-```
+El flujo **Release Windows** puede ejecutarse desde Actions o al publicar una rama `release/VERSION` que coincida con `package.json`. Comprueba el motor oficial, ejecuta las pruebas, compila el ZIP, verifica una apertura con una base vacía y publica la release con el ZIP y su SHA-256. La rama de release debe apuntar al mismo commit que `main` antes de lanzarlo. No necesita claves Google ni datos reales.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, readdir } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { Store, defaults, todayIn, addDays, weekday } from '../app/domain.mjs';
@@ -43,7 +43,8 @@ function remote(){
   return api;
 }
 async function fixture(t){
-  const testRoot=path.resolve('.local'),dir=await mkdtemp(path.join(testRoot,'amapola-google-')),store=new Store(':memory:'),api=remote();
+  const testRoot=path.resolve('.local');await mkdir(testRoot,{recursive:true});
+  const dir=await mkdtemp(path.join(testRoot,'amapola-google-')),store=new Store(':memory:'),api=remote();
   store.saveSettings({...defaults,timezone:'UTC'});
   const sync=new GoogleSync(store,dir,{fetchImpl:api.fetch});
   sync.config={namespace:'12345678-1234-1234-1234-123456789abc',account:'personal',calendarId:'target',sourceIds:null,paused:false,lastSync:''};sync.saveConfig();

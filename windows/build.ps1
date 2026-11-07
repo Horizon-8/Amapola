@@ -34,4 +34,6 @@ $packageVersion = (Get-Content -LiteralPath (Join-Path $project 'package.json') 
 $zip = Join-Path $release "Amapola-$packageVersion-Windows.zip"
 # Explicit allowlist: never ship development databases, test students or logs.
 Compress-Archive -LiteralPath (Join-Path $project 'app'), (Join-Path $project 'runtime'), (Join-Path $project 'windows'), (Join-Path $project 'tests'), (Join-Path $project 'Amapola.exe'), (Join-Path $project 'Crear-acceso-directo.vbs'), (Join-Path $project 'LEEME.html'), (Join-Path $project 'README.md'), (Join-Path $project 'TESTS-UI.md'), (Join-Path $project 'INSTALLATION-FR.md'), (Join-Path $project 'GUIA-COPIAS.md'), (Join-Path $project 'GITHUB.md'), (Join-Path $project 'GOOGLE-CALENDAR.md'), (Join-Path $project 'package.json') -DestinationPath $zip -Force
+# Include the release notes and the review referenced by README.md.
+Compress-Archive -LiteralPath (Join-Path $project 'RELEASE-NOTES.md'), (Join-Path $project 'AUDIT-AMAPOLA.md') -DestinationPath $zip -Update
 Write-Output $zip
