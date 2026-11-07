@@ -163,3 +163,65 @@
 .inline-event .compact .pill-icon svg{width:11px;height:11px}
 .short-event .compact .pill-icon svg{width:9px;height:9px}
 .short-event .class-status.cancelled .pill-icon svg{stroke-width:3.5}
+
+/* Calendar controls share one toolbar; the agenda list floats above the grid. */
+.calendar-page .page-heading{margin-bottom:16px}
+.calendar-page .stats{gap:12px;margin-bottom:16px}
+.calendar-page .stat-card{padding:12px 18px;display:grid;grid-template-columns:1fr auto;gap:3px 16px;align-items:center}
+.calendar-page .stat-top{grid-column:1;font-size:11px;margin:0;gap:8px}
+.calendar-page .stat-icon{width:25px;height:25px}
+.calendar-page .stat-value{grid-column:2;grid-row:1/3;margin:0;font-size:25px;white-space:nowrap}
+.calendar-page .stat-caption{grid-column:1;font-size:10px}
+.calendar-page .stat-caption a{display:inline-flex;align-items:center;gap:4px}
+.calendar-panel{overflow:visible}
+.calendar-toolbar{padding:13px 18px;gap:14px;flex-wrap:wrap;position:relative;z-index:15;border-radius:var(--radius) var(--radius) 0 0}
+.calendar-toolbar .calendar-controls{gap:5px}
+.calendar-toolbar .calendar-range{min-width:160px;font-size:12px}
+.calendar-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:1}
+.calendar-sync-controls{display:flex;align-items:center;gap:8px;margin:0}
+.calendar-toolbar .btn{padding:8px 11px;min-height:36px;font-size:11px}
+.btn.google-receive{background:#dcefe8;border-color:#96c8b3;color:#175940}
+.btn.google-send{background:var(--rose-bg);border-color:var(--rose);color:var(--rose-dark)}
+.btn.google-receive:hover{background:#c7e5d8;border-color:#327d5c;color:#164c38}
+.btn.google-send:hover{background:var(--rose);color:var(--surface)}
+.calendar-sync-controls .btn:disabled{opacity:1;cursor:not-allowed;filter:saturate(.55);border-style:dashed}
+.btn.google-ok{background:#d9efdf;border-color:#72ad89;color:#225936}
+.btn.google-failed{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border-color:var(--danger);color:var(--danger)}
+.calendar-agendas{position:relative;flex-shrink:0}
+.calendar-agendas summary{display:flex;align-items:center;gap:7px;list-style:none;cursor:pointer;padding:8px 11px;min-height:36px;border:1px solid var(--rose);border-radius:9px;background:var(--rose-soft);color:var(--rose);font-size:11px;font-weight:600;user-select:none}
+.calendar-agendas summary::-webkit-details-marker{display:none}
+.calendar-agendas summary:focus-visible{outline:3px solid var(--rose);outline-offset:3px}
+.calendar-agendas[open] summary{background:var(--rose-bg)}
+.calendar-agendas summary svg{width:16px;height:16px}
+.agenda-count{padding:1px 5px;border-radius:5px;background:var(--rose-bg);font-size:10px}
+.agenda-chevron{font-size:16px;line-height:1;transition:transform .15s}
+.calendar-agendas[open] .agenda-chevron{transform:rotate(180deg)}
+.calendar-agendas .calendar-visibility{position:absolute;right:0;top:calc(100% + 9px);display:flex;flex-direction:column;align-items:stretch;gap:3px;width:285px;max-height:330px;overflow:auto;margin:0;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 35px #0003}
+.calendar-agendas .calendar-visibility legend{padding:0 5px;color:var(--muted);font-size:11px}
+.calendar-agendas .calendar-visibility label{padding:9px 7px;border-radius:7px;font-size:12px;align-items:flex-start}
+.calendar-agendas .calendar-visibility label:hover{background:var(--rose-soft)}
+.calendar-agendas .calendar-visibility input{accent-color:var(--rose);margin:3px 5px 0 0;flex-shrink:0}
+.calendar-agendas .calendar-visibility span{overflow-wrap:anywhere}
+.calendar-agendas .calendar-visibility small{padding:9px 7px 1px;margin-top:5px;border-top:1px solid var(--line);line-height:1.6}
+[data-theme=dark] .btn.google-receive{background:#244a3c;border-color:#5eab88;color:#c4edda}
+[data-theme=dark] .btn.google-receive:hover{background:#305f4d;color:#e4fff1}
+[data-theme=dark] .btn.google-send{background:#593447;border-color:#cf7299;color:#ffd0e1}
+[data-theme=dark] .btn.google-send:hover{background:#75445e}
+[data-theme=dark] .btn.google-ok{background:#254332;border-color:#558968;color:#c5edd2}
+[data-theme=dark] .btn.google-failed{background:#4e2b38;border-color:var(--danger);color:var(--danger)}
+/* Welcome covers local loading and the real Google receipt, never an upload. */
+.startup-screen{position:fixed;inset:0;z-index:200;background:var(--bg);display:grid;place-items:center;text-align:center}
+.startup-screen[hidden]{display:none}
+.startup-brand{padding:35px;animation:welcome-in .65s ease-out both}
+.startup-emblem{position:relative;width:124px;height:124px;display:grid;place-items:center;margin:0 auto 22px}
+.startup-emblem>span{font:124px Georgia,serif;line-height:1;color:var(--rose);animation:welcome-flower 1.8s ease-in-out infinite}
+.startup-emblem b{position:absolute;inset:0;display:grid;place-items:center;font:32px Georgia,serif;color:var(--surface);padding-top:6px;text-shadow:0 1px 5px #5c173047}
+.startup-brand h1{font-size:45px;letter-spacing:-1.5px;margin-bottom:9px}
+.startup-tagline{color:var(--rose);font-size:10px;text-transform:uppercase;letter-spacing:2.5px}
+.startup-track{width:140px;height:3px;margin:27px auto 17px;background:var(--rose-bg);border-radius:5px;overflow:hidden}
+.startup-track span{display:block;height:100%;width:45%;border-radius:5px;background:var(--rose);animation:welcome-track 1.2s ease-in-out infinite}
+#startup-message{font-size:12px;color:var(--muted);max-width:350px;min-height:36px}
+@keyframes welcome-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes welcome-flower{0%,100%{transform:rotate(-12deg) scale(.94)}50%{transform:rotate(18deg) scale(1.04)}}
+@keyframes welcome-track{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+@media(max-width:1250px){.calendar-toolbar{gap:10px}.calendar-tools{order:3;flex-basis:100%;justify-content:flex-start}.calendar-toolbar>.view-toggle{margin-left:auto}.calendar-tools .calendar-agendas{margin-left:auto}.calendar-page .stat-card{padding:10px 12px}.calendar-page .stat-value{font-size:21px}}

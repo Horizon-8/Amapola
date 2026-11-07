@@ -2,7 +2,7 @@ let attachCalendarGestures, attachCalendarClock, paymentState, hasEnded;
 try {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(10000) });
   const health = await response.json();
-  if (!response.ok || health.app !== 'amapola' || health.version !== '0.7.1') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
+  if (!response.ok || health.app !== 'amapola' || health.version !== '0.8.0') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
   ({ attachCalendarGestures } = await import('./calendar-interactions.mjs'));
   ({ attachCalendarClock } = await import('./calendar-clock.mjs'));
   ({ paymentState, hasEnded } = await import('./class-utils.mjs'));
@@ -13,6 +13,8 @@ try {
   const message = document.createElement('p'); message.textContent = error.message.startsWith('Hay una versión anterior') ? error.message : 'No se pudieron cargar los archivos de la aplicación. Abre Amapola.exe desde la carpeta del proyecto y vuelve a cargar esta pestaña.';
   const retry = document.createElement('button'); retry.className = 'btn'; retry.textContent = 'Volver a cargar'; retry.addEventListener('click', () => location.reload());
   panel.append(title, message, retry); target.replaceChildren(panel);
+  document.getElementById('startup-screen')?.remove();
+  document.querySelectorAll('[data-opening-inert]').forEach(element=>element.inert=false);
   throw error;
 }
 /* Amapola — no business data is stored in the browser. Only appearance is local. */
@@ -57,7 +59,7 @@ const palette = ['#bc587a','#8b79bd','#bf895b','#698f9d','#8c9a65','#d88396','#6
 const S = { students:[], schedules:[], settings:{currency:'COP',timezone:'America/Bogota'}, csrf:'', today:'', week:'', calendarMode:'week', planDay:null, studentTab:'planning', reportTab:'current', search:'', channel:'all', active:'all', renderId:0 };
 Object.assign(S, { classPeriod:'past', classFilters:{from:'',to:'',student:'',payment:'all',method:'',status:''}, classPage:1 });
 const calendarScale=0.8;
-S.busyBlocks=[];S.calendarConnectionCheck=0;S.startupHandled=false;
+S.busyBlocks=[];S.calendarConnectionCheck=0;S.startupHandled=false;S.opening=true;
 let disposeCalendar = () => {};
 let theme = 'system';
 try { theme = localStorage.getItem('amapola-theme') || 'system'; } catch {}
@@ -228,6 +230,7 @@ function agenda(rows) {
   return [...new Set(rows.map(r=>r.date))].map(date=>`<div class="agenda-day">${fmtDate(date,{weekday:'long',day:'numeric',month:'long'})}</div>${rows.filter(r=>r.date===date).map(r=>r.kind==='busy'?`<div class="agenda-item busy-agenda ${r.source==='google'?'google-busy':''} ${r.needsAssignment?'google-pending':''}" role="button" tabindex="0" data-action="${r.source==='google'?'google-event':'edit-busy'}" data-id="${esc(r.id)}"><div class="agenda-time">${r.time}<div class="student-secondary">${end(r)}</div></div><span class="modality-icon busy">${icon('clock')}</span><div class="agenda-info"><div class="student-name">${esc(r.title)}</div><div class="student-secondary">${r.needsAssignment?'Google · Completar clase':r.source==='google'?'Busy · '+esc(r.calendarName):'Ocupada · No disponible para clases'}</div></div><span class="badge">${r.duration} min</span>${icon('right')}</div>`:`<div class="agenda-item" role="button" tabindex="0" data-action="edit-session" data-id="${esc(r.id)}"><div class="agenda-time">${r.time}<div class="student-secondary">${end(r)}</div></div>${avatar(studentBy(r.studentId))}<div class="agenda-info"><div class="student-name">${esc(r.studentName)}</div><div class="student-secondary">${esc(r.title)} · ${r.duration} min</div></div>${modalityBadge(r)}${statusBadge(r)}${paymentPill(r)}<span class="price">${money(r.price)}</span>${icon('right')}</div>`).join('')}`).join('');
 }
 function syncOverlay(status) {
+  if(S.opening){const message=$('#startup-message');if(message&&status?.state==='syncing')message.textContent=status.operation?.stage||status.message||'Recibiendo de Google…';return;}
   const dialog=$('#google-progress');if(!dialog)return;
   if(status?.state==='syncing'){
     const op=status.operation||{};
@@ -270,14 +273,25 @@ async function checkCalendarEntry() {
     if(status.online===false&&!$('#dialog').open)calendarConnectionWarning(status.connectionIssue||status.message);
   }catch(error){if(entry===S.calendarConnectionCheck&&(!location.hash||location.hash==='#calendario')&&!$('#dialog').open)calendarConnectionWarning(error.message);}
 }
-function startupGooglePrompt() {
-  const g=S.google||{};
-  if(!g.configured)return;
-  if(!g.connected){calendarConnectionWarning('Google no está conectado. Los agendas no se han actualizado.');return;}
-  if(g.paused){toast('Google está en pausa después de la restauración. Revisa la conexión en Mi información.',true);return;}
-  modal('¿Actualizar desde Google?','Recibir los próximos 30 días antes de empezar.',
-    '<p>Google actualizará las clases vinculadas y los bloques Busy. Las clases locales que nunca se enviaron se conservan.</p><p class="help-text">Esta acción solo recibe datos; no envía cambios a Google.</p>',
-    '<button class="btn" type="button" data-action="google-start-skip">Trabajar sin actualizar</button>'+submitBtn('Recibir de Google'),async()=>{await runGoogleSync('pull');$('#dialog').close();});
+async function openApplication() {
+  S.opening=true;
+  const animation=new Promise(resolve=>setTimeout(resolve,window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:1700));
+  let warning='',ready=false;
+  try{
+    await refresh();
+    const g=S.google||{};
+    if(g.connected&&!g.paused){try{await runGoogleSync('pull');}catch(error){warning=error.message;}}
+    else if(g.configured&&!g.connected)warning='Google no está conectado. Los agendas no se han actualizado.';
+    await render();ready=true;
+  }catch(error){$('#main').innerHTML=empty('No se pudo conectar',esc(error.message),'<button class="btn" data-action="retry">Reintentar</button>');}
+  finally{
+    await animation;
+    const screen=$('#startup-screen');if(screen)screen.hidden=true;
+    $$('[data-opening-inert]').forEach(element=>element.inert=false);
+    S.opening=false;S.startupHandled=true;
+  }
+  if(ready&&warning)calendarConnectionWarning(warning);
+  else if(ready&&S.google?.paused)toast('Google está en pausa después de la restauración. Revisa la conexión en Mi información.',true);
 }
 async function shutdownLocalApp() {
   await api('/api/shutdown','POST',{});disposeCalendar();$('#main').innerHTML=empty('Hasta tu próxima clase','Amapola está cerrada. Puedes cerrar esta pestaña.');toast('Aplicación cerrada.');
@@ -291,7 +305,7 @@ function shutdownPrompt() {
 function calendarVisibilityControls() {
   const g=S.google||{},hidden=new Set(g.hiddenCalendarIds||[]),choices=[{id:'$amapola',title:'Amapola · cursos'},{id:'$local-busy',title:'Ocupada · local'}];
   for(const calendar of g.calendars||[])if(calendar.id!==g.calendarId&&(g.sourceIds===null||g.sourceIds?.includes(calendar.id)))choices.push(calendar);
-  return `<fieldset class="calendar-visibility"><legend>Agendas visibles</legend>${choices.map(c=>`<label><input type="checkbox" data-calendar-visibility="${esc(c.id)}" ${hidden.has(c.id)?'':'checked'}><span>${esc(c.title)}</span></label>`).join('')}<small>Ocultar no desactiva la sincronización ni los avisos de solapamiento.</small></fieldset>`;
+  return `<details class="calendar-agendas" id="calendar-agendas"><summary title="Elegir los agendas visibles">${icon('calendar')}<span>Agendas</span><span class="agenda-count">${choices.filter(c=>!hidden.has(c.id)).length}/${choices.length}</span><span class="agenda-chevron" aria-hidden="true">⌄</span></summary><fieldset class="calendar-visibility"><legend>Agendas visibles</legend>${choices.map(c=>`<label><input type="checkbox" data-calendar-visibility="${esc(c.id)}" ${hidden.has(c.id)?'':'checked'}><span>${esc(c.title)}</span></label>`).join('')}<small>Ocultar no desactiva la sincronización ni los avisos de solapamiento.</small></fieldset></details>`;
 }
 function calendarRowVisible(row) {
   const g=S.google||{},hidden=new Set(g.hiddenCalendarIds||[]);
@@ -311,7 +325,8 @@ function googleSyncStatus() {
 }
 function calendarSyncControls() {
   const g=S.google||{},disabled=!g.connected||g.state==='syncing'||g.state==='paused';
-  return `<div class="calendar-sync-controls" aria-label="Sincronización Google"><div class="button-row"><button class="btn ${g.lastPull&&!g.lastPullError?'google-ok':''}" data-action="google-pull" data-google-direction="pull" ${disabled?'disabled':''} title="Google → Amapola. Google reemplaza los datos de los cursos vinculados; los cursos locales nuevos se conservan.">${icon('download')} Actualizar desde Google</button><button class="btn ${g.lastPush&&!g.lastPushError?'google-ok':''}" data-action="google-push" data-google-direction="push" ${disabled?'disabled':''} title="Amapola → Google. Envía directamente las clases locales, sin recibir cambios.">${icon('cloud')} Enviar a Google</button></div><p class="small-text muted">Próximos 30 días · ${g.connected?'Intercambios manuales. Cada flecha define qué agenda tiene prioridad.':'Conecta Google en Mi información.'}</p><div class="sync-timestamps"><span>↓ ${g.lastPull?'Recibido: '+esc(new Date(g.lastPull).toLocaleString('es')):'Sin recepción confirmada'}</span><span>↑ ${g.lastPush?'Enviado: '+esc(new Date(g.lastPush).toLocaleString('es')):'Sin envío confirmado'}${g.pending?' · Cambios locales pendientes':''}</span></div></div>`;
+  const stamp=direction=>{const date=direction==='pull'?g.lastPull:g.lastPush;return date?new Date(date).toLocaleString('es'):'Todavía sin confirmar';};
+  return `<div class="calendar-sync-controls" aria-label="Sincronización Google"><button class="btn google-receive ${g.lastPull&&!g.lastPullError?'google-ok':''}" data-action="google-pull" data-google-direction="pull" ${disabled?'disabled':''} title="Google → Amapola · Próximos 30 días. Google reemplaza los cursos vinculados; los nuevos locales se conservan. Última recepción: ${esc(stamp('pull'))}">${icon('download')} Actualizar desde Google</button><button class="btn google-send ${g.lastPush&&!g.lastPushError?'google-ok':''}" data-action="google-push" data-google-direction="push" ${disabled?'disabled':''} title="Amapola → Google · Envía directamente las clases locales, sin recibir cambios. Último envío: ${esc(stamp('push'))}${g.pending?' · Cambios locales pendientes':''}">${icon('cloud')} Enviar a Google</button></div>`;
 }
 function googleInboxPanel() {
   const g=S.google||{},inbox=(g.inbox||[]).filter(r=>calendarRowVisible({...r,kind:'busy',source:'google'})),reviews=g.reviews||[];
@@ -320,7 +335,7 @@ function googleInboxPanel() {
 }
 function googleSettings() {
   const g=S.google||{},calendars=S.googleCalendars||[];
-  return `<section class="panel settings-section" id="google-section"><div class="panel-header"><div><h2>Sincronización con Google Calendar</h2><p class="subtitle small-text">Próximos 30 días. Recibir y enviar son acciones independientes.</p></div>${icon('cloud')}</div><div class="panel-body"><p class="small-text">Amapola escribe únicamente en su agenda <strong>Amapola</strong>. Los demás agendas se leen como bloques <strong>Busy</strong> grises y rayados. Para crear una clase desde el móvil, usa el agenda Amapola. En otro agenda, escribe Amapola al principio de su descripción.</p><div class="notice"><div><strong>${esc(g.message||'Google sin conectar')}</strong>${g.account?`<div>${esc(g.account)}</div>`:''}${g.lastPull?`<div class="small-text">Última recepción: ${esc(new Date(g.lastPull).toLocaleString('es'))}</div>`:''}${g.lastPush?`<div class="small-text">Último envío: ${esc(new Date(g.lastPush).toLocaleString('es'))}</div>`:''}</div></div><div class="button-row"><label class="btn file-label" for="google-client">${g.configured?'Cambiar archivo de conexión':'Importar conexión Google (.json)'}</label><input id="google-client" type="file" class="file-input" accept=".json,application/json"><button class="btn primary" data-action="google-connect" ${!g.configured?'disabled':''}>${g.connected?'Reconectar Google':'Conectar Google'}</button>${g.connected?`<button class="btn" data-action="google-sync" ${g.state==='syncing'?'disabled':''}>Sincronizar ahora</button><button class="btn" data-action="google-calendars">Cargar agendas</button><button class="btn" data-action="google-disconnect">Desconectar</button>`:''}${g.state==='paused'?'<button class="btn primary" data-action="google-resume">Reanudar sincronización</button>':''}</div><p class="help-text">${g.configured?'Conecta tu cuenta y elige los agendas.':'La primera conexión requiere un cliente Google de tipo Aplicación de escritorio. Consulta GOOGLE-CALENDAR.md en la carpeta de Amapola.'} La autorización queda protegida en este PC y no se incluye en las copias de datos.</p>${S.googleCalendarError?`<p class="form-error">${esc(S.googleCalendarError)}</p>`:''}${calendars.length?`<form id="google-calendars-form"><fieldset class="google-calendar-list"><legend>Agendas de Google que se reciben en Amapola</legend>${calendars.map(c=>`<label class="checkbox-field"><input type="checkbox" name="calendar" value="${esc(c.id)}" ${c.id===g.calendarId?'checked disabled':g.sourceIds===null||g.sourceIds?.includes(c.id)?'checked':''}><span>${esc(c.title)}${c.id===g.calendarId?' · Clases Amapola (siempre sincronizado)':c.primary?' · Principal':''}</span></label>`).join('')}</fieldset><button class="btn primary" type="submit">Guardar selección de agendas</button><p class="help-text">Todos los agendas accesibles están seleccionados inicialmente. Los nuevos agendas también se leen mientras no guardes una selección personalizada.</p></form>`:''}<p class="help-text">Al abrir se propone recibir Google. Después, los intercambios son manuales: Actualizar recibe y Enviar aplica Amapola a Google. En Calendario puedes ocultar agendas sin dejar de recibirlos ni desactivar sus avisos de solapamiento. Sin Internet, los cambios quedan guardados localmente. Una eliminación confirmada en Google cancela la clase aquí y conserva su pago e historial. Eliminar una clase en Amapola elimina su evento en Google después de sincronizar.</p></div></section>`;
+  return `<section class="panel settings-section" id="google-section"><div class="panel-header"><div><h2>Sincronización con Google Calendar</h2><p class="subtitle small-text">Próximos 30 días. Recibir y enviar son acciones independientes.</p></div>${icon('cloud')}</div><div class="panel-body"><p class="small-text">Amapola escribe únicamente en su agenda <strong>Amapola</strong>. Los demás agendas se leen como bloques <strong>Busy</strong> grises y rayados. Para crear una clase desde el móvil, usa el agenda Amapola. En otro agenda, escribe Amapola al principio de su descripción.</p><div class="notice"><div><strong>${esc(g.message||'Google sin conectar')}</strong>${g.account?`<div>${esc(g.account)}</div>`:''}${g.lastPull?`<div class="small-text">Última recepción: ${esc(new Date(g.lastPull).toLocaleString('es'))}</div>`:''}${g.lastPush?`<div class="small-text">Último envío: ${esc(new Date(g.lastPush).toLocaleString('es'))}</div>`:''}</div></div><div class="button-row"><label class="btn file-label" for="google-client">${g.configured?'Cambiar archivo de conexión':'Importar conexión Google (.json)'}</label><input id="google-client" type="file" class="file-input" accept=".json,application/json"><button class="btn primary" data-action="google-connect" ${!g.configured?'disabled':''}>${g.connected?'Reconectar Google':'Conectar Google'}</button>${g.connected?`<button class="btn" data-action="google-sync" ${g.state==='syncing'?'disabled':''}>Sincronizar ahora</button><button class="btn" data-action="google-calendars">Cargar agendas</button><button class="btn" data-action="google-disconnect">Desconectar</button>`:''}${g.state==='paused'?'<button class="btn primary" data-action="google-resume">Reanudar sincronización</button>':''}</div><p class="help-text">${g.configured?'Conecta tu cuenta y elige los agendas.':'La primera conexión requiere un cliente Google de tipo Aplicación de escritorio. Consulta GOOGLE-CALENDAR.md en la carpeta de Amapola.'} La autorización queda protegida en este PC y no se incluye en las copias de datos.</p>${S.googleCalendarError?`<p class="form-error">${esc(S.googleCalendarError)}</p>`:''}${calendars.length?`<form id="google-calendars-form"><fieldset class="google-calendar-list"><legend>Agendas de Google que se reciben en Amapola</legend>${calendars.map(c=>`<label class="checkbox-field"><input type="checkbox" name="calendar" value="${esc(c.id)}" ${c.id===g.calendarId?'checked disabled':g.sourceIds===null||g.sourceIds?.includes(c.id)?'checked':''}><span>${esc(c.title)}${c.id===g.calendarId?' · Clases Amapola (siempre sincronizado)':c.primary?' · Principal':''}</span></label>`).join('')}</fieldset><button class="btn primary" type="submit">Guardar selección de agendas</button><p class="help-text">Todos los agendas accesibles están seleccionados inicialmente. Los nuevos agendas también se leen mientras no guardes una selección personalizada.</p></form>`:''}<p class="help-text">Al abrir se recibe Google durante la bienvenida, si está conectado y no está en pausa. Después, los intercambios son manuales: Actualizar recibe y Enviar aplica Amapola a Google. En Calendario puedes ocultar agendas sin dejar de recibirlos ni desactivar sus avisos de solapamiento. Sin Internet, los cambios quedan guardados localmente. Una eliminación confirmada en Google cancela la clase aquí y conserva su pago e historial. Eliminar una clase en Amapola elimina su evento en Google después de sincronizar.</p></div></section>`;
 }
 async function loadGoogleCalendars() {
   try {S.googleCalendars=(await api('/api/google/calendars')).calendars;S.googleCalendarError='';}
@@ -342,7 +357,7 @@ function googleCompleteModal(id) {
 function renderCalendar(rows,report,blocks=[]) {
   S.rows=rows;S.busyBlocks=blocks;
   const events=[...rows,...blocks].filter(calendarRowVisible).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  return heading('TU TIEMPO, CON INTENCIÓN','Calendario','Crea y organiza tus clases en intervalos de 15 minutos.',`<div class="button-row"><button class="btn busy-button" data-action="new-busy">${icon('clock')} Ocupada</button>${newClass()}</div>`)+calendarSyncControls()+calendarVisibilityControls()+summary(report)+googleInboxPanel()+`<section class="panel"><div class="panel-header">${weekControls()}<div class="view-toggle" aria-label="Vista del calendario"><button class="${S.calendarMode==='week'?'active':''}" aria-pressed="${S.calendarMode==='week'}" data-action="calendar-week">${icon('calendar')} Semana</button><button class="${S.calendarMode==='agenda'?'active':''}" aria-pressed="${S.calendarMode==='agenda'}" data-action="calendar-agenda">${icon('plan')} Agenda</button></div></div>${S.calendarMode==='week'?calendarGrid(events):agenda(events)}${legend(events)}<div class="payment-legend"><span><span class="payment-dot paid">$</span> Pagada</span><span><span class="payment-dot overdue">$</span> Vencida sin pagar</span><span><span class="payment-dot pending">$</span> Pendiente / sin cobro</span></div></section><p class="calendar-mobile-hint">Desliza horizontalmente para ver todos los días. También puedes usar la vista Agenda.</p><p class="inline-help">${icon('info')} Pulsa o arrastra un espacio vacío para crear una clase o marcarte ocupada. Arrastra los bloques para moverlos y sus bordes para ajustar su duración. Los bloqueos grises son recordatorios de indisponibilidad y no generan ingresos.</p>`;
+  return '<div class="calendar-page">'+heading('TU TIEMPO, CON INTENCIÓN','Calendario','Crea y organiza tus clases en intervalos de 15 minutos.',`<div class="button-row"><button class="btn busy-button" data-action="new-busy">${icon('clock')} Ocupada</button>${newClass()}</div>`)+summary(report)+googleInboxPanel()+`<section class="panel calendar-panel"><div class="panel-header calendar-toolbar">${weekControls()}<div class="calendar-tools">${calendarSyncControls()}${calendarVisibilityControls()}</div><div class="view-toggle" aria-label="Vista del calendario"><button class="${S.calendarMode==='week'?'active':''}" aria-pressed="${S.calendarMode==='week'}" data-action="calendar-week">${icon('calendar')} Semana</button><button class="${S.calendarMode==='agenda'?'active':''}" aria-pressed="${S.calendarMode==='agenda'}" data-action="calendar-agenda">${icon('plan')} Agenda</button></div></div>${S.calendarMode==='week'?calendarGrid(events):agenda(events)}${legend(events)}<div class="payment-legend"><span><span class="payment-dot paid">$</span> Pagada</span><span><span class="payment-dot overdue">$</span> Vencida sin pagar</span><span><span class="payment-dot pending">$</span> Pendiente / sin cobro</span></div></section><p class="calendar-mobile-hint">Desliza horizontalmente para ver todos los días. También puedes usar la vista Agenda.</p><p class="inline-help">${icon('info')} Pulsa o arrastra un espacio vacío para crear una clase o marcarte ocupada. Arrastra los bloques para moverlos y sus bordes para ajustar su duración. Los bloqueos grises son recordatorios de indisponibilidad y no generan ingresos.</p></div>`;
 }
 function renderStudents() {
   return heading('PERSONAS QUE APRENDEN CONTIGO','Alumnos','Alumnos y contactos con los que estás conversando, en un mismo lugar.',`<button class="btn primary" data-action="new-student">${icon('plus')} Nuevo alumno</button>`)+`<div class="tabs student-status-tabs">${[['all','Todos'],['active','Activos'],['prospect','En conversación'],['inactive','Inactivos']].map(([key,label])=>`<button class="tab ${S.active===key?'active':''}" data-action="student-filter" data-status="${key}">${label} <span class="muted">(${S.students.filter(s=>key==='all'||studentStatus(s)===key).length})</span></button>`).join('')}</div><section class="panel"><div class="toolbar"><div class="search">${icon('search')}<input id="student-search" aria-label="Buscar alumnos" placeholder="Buscar por nombre, correo o teléfono…" value="${esc(S.search)}"></div><div class="button-row"><select id="student-channel" class="filter-select" aria-label="Filtrar por canal"><option value="all">Todos los canales</option>${Object.entries(channelNames).map(([v,l])=>`<option value="${v}" ${S.channel===v?'selected':''}>${l}</option>`).join('')}</select><select id="student-active" class="filter-select" aria-label="Filtrar por estado"><option value="all">Todos los alumnos</option><option value="active" ${S.active==='active'?'selected':''}>Activos</option><option value="prospect" ${S.active==='prospect'?'selected':''}>En conversación</option><option value="inactive" ${S.active==='inactive'?'selected':''}>Inactivos</option></select></div></div><div id="students-table"></div></section><p class="inline-help">Cada alumno tiene su propio color. Lo reconocerás también en el calendario.</p>`;
@@ -382,6 +397,7 @@ async function render() {
   const names={calendario:'Calendario',alumnos:'Alumnos',clases:'Clases',planificacion:'Planificación',informes:'Informes',ajustes:'Mi información'};
   if(!names[page]){location.hash='calendario';return;}
   $$('[data-nav]').forEach(n=>n.classList.toggle('active',n.dataset.nav===page));$('#page-name').textContent=names[page];document.title=`${names[page]} · Amapola`;
+  const agendaMenuOpen=$('#calendar-agendas')?.open;
   const oldScroll=$('.calendar-scroll')?.scrollTop,enteringCalendar=page==='calendario'&&S.currentPage!=='calendario';
   try {
     let html;
@@ -393,7 +409,8 @@ async function render() {
     if(page==='informes'){const report=await api(`/api/reports?week=${S.week}`);if(ticket!==S.renderId)return;html=renderReports(report);}
     if(page==='ajustes'){const backups=await api('/api/backups');if(ticket!==S.renderId)return;html=renderSettings(backups);}
     disposeCalendar();$('#main').innerHTML=html;fillStudentTable();S.googleRenderedRevision=S.google?.revision;S.currentPage=page;googleSyncStatus();if(enteringCalendar&&S.startupHandled)void checkCalendarEntry();
-    $$('[data-calendar-visibility]').forEach(input=>input.addEventListener('change',async()=>{const hidden=new Set(S.google?.hiddenCalendarIds||[]);if(input.checked)hidden.delete(input.dataset.calendarVisibility);else hidden.add(input.dataset.calendarVisibility);try{S.google=await api('/api/google/visibility','PUT',{hiddenIds:[...hidden]});await render();}catch(error){input.checked=!input.checked;toast(error.message,true);}}));
+    const agendaMenu=$('#calendar-agendas');if(agendaMenu)agendaMenu.open=!!agendaMenuOpen;
+    $$('[data-calendar-visibility]').forEach(input=>input.addEventListener('change',async()=>{const hidden=new Set(S.google?.hiddenCalendarIds||[]);if(input.checked)hidden.delete(input.dataset.calendarVisibility);else hidden.add(input.dataset.calendarVisibility);const fields=$$('[data-calendar-visibility]');fields.forEach(field=>field.disabled=true);try{S.google=await api('/api/google/visibility','PUT',{hiddenIds:[...hidden]});await render();}catch(error){input.checked=!input.checked;toast(error.message,true);}finally{fields.forEach(field=>field.disabled=false);}}));
     if(page==='ajustes')$('#main').insertAdjacentHTML('beforeend',googleSettings());
     if($('#google-client'))$('#google-client').addEventListener('change',async ev=>{const file=ev.target.files[0];if(!file)return;try{if(file.size>100000)throw Error('Archivo de conexión demasiado grande.');const client=JSON.parse(await file.text());await api('/api/google/client','POST',client);await refresh();await render();toast('Conexión preparada. Pulsa Conectar Google.');}catch(error){toast(error.message,true);}});
     if($('#google-calendars-form'))$('#google-calendars-form').addEventListener('submit',async ev=>{ev.preventDefault();try{const ids=[...new FormData(ev.target).getAll('calendar')];await api('/api/google/calendars','PUT',{ids});await refresh();await render();toast('Selección guardada. Pulsa Actualizar para recibir los agendas.');}catch(error){toast(error.message,true);}});
@@ -586,6 +603,7 @@ async function previewRestore(file) {
   }catch(e){toast(e.message,true);}
 }
 document.addEventListener('click',async ev=>{
+  const agendaMenu=$('#calendar-agendas');if(agendaMenu?.open&&!agendaMenu.contains(ev.target))agendaMenu.open=false;
   const themeChoice=ev.target.closest('[data-theme-choice]');if(themeChoice){applyTheme(themeChoice.dataset.themeChoice);return;}
   const scroll=ev.target.closest('[data-scroll]');if(scroll){ev.preventDefault();document.getElementById(scroll.dataset.scroll)?.scrollIntoView({behavior:'smooth'});return;}
   const b=ev.target.closest('[data-action]');if(!b)return;
@@ -607,7 +625,6 @@ document.addEventListener('click',async ev=>{
     if(action==='google-settings'){if($('#dialog').open)$('#dialog').close();location.hash='ajustes';return;}
     if(action==='google-connect'){const result=await api('/api/google/connect','POST',{});location.href=result.url;return;}
     if(['google-sync','google-pull','google-push'].includes(action)){await runGoogleSync(action==='google-push'?'push':'pull');if($('#dialog').open)$('#dialog').close();return;}
-    if(action==='google-start-skip'){$('#dialog').close();if(!location.hash||location.hash==='#calendario')void checkCalendarEntry();return;}
     if(action==='google-close-without'){await shutdownLocalApp();$('#dialog').close();return;}
     if(action==='google-calendars'){await loadGoogleCalendars();return;}
     if(action==='google-disconnect'){confirmAction('¿Desconectar Google?','Los eventos Google y los datos locales se conservan. Los próximos cambios quedarán pendientes hasta volver a conectar.','Desconectar',async()=>{await api('/api/google/disconnect','POST',{});S.googleCalendars=[];await refresh();await render();});return;}
@@ -622,14 +639,14 @@ document.addEventListener('click',async ev=>{
     if(action==='retry'){await refresh();await render();}
   }catch(e){toast(e.message,true);}
 });
-document.addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.agenda-item,.calendar-event')){ev.preventDefault();ev.target.click();}});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){const menu=$('#calendar-agendas');if(menu?.open){menu.open=false;$('summary',menu)?.focus();}}if((ev.key==='Enter'||ev.key===' ')&&ev.target.matches('.agenda-item,.calendar-event')){ev.preventDefault();ev.target.click();}});
 $('#theme-toggle').addEventListener('click',()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));
 $('#shutdown').addEventListener('click',shutdownPrompt);
 $('#google-progress').addEventListener('cancel',event=>event.preventDefault());
-window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#alumnos/'))S.studentTab='planning';render();});
-window.addEventListener('focus',async()=>{if(S.csrf){try{const old=S.today;await refresh();if(old!==S.today)await render();}catch{}}});
+window.addEventListener('hashchange',()=>{if(S.opening)return;if(!location.hash.startsWith('#alumnos/'))S.studentTab='planning';render();});
+window.addEventListener('focus',async()=>{if(S.csrf&&!S.opening){try{const old=S.today;await refresh();if(old!==S.today)await render();}catch{}}});
 applyTheme(theme);
-refresh().then(async()=>{await render();S.startupHandled=true;startupGooglePrompt();}).catch(e=>{$('#main').innerHTML=empty('No se pudo conectar',esc(e.message),'<button class="btn" data-action="retry">Reintentar</button>');});
+void openApplication();
 
 // Refresh due-payment colors when a class ends while the calendar stays open.
 setInterval(()=>{
@@ -645,7 +662,7 @@ setInterval(()=>{
 // Poll the local process, not Google directly. Calendar writes run only in the sync service.
 let googlePolling=false;
 setInterval(async()=>{
-  if(googlePolling||document.hidden||!S.csrf)return;
+  if(googlePolling||document.hidden||!S.csrf||S.opening)return;
   googlePolling=true;
   try {
     const previous=S.google?.state,next=await api('/api/google/status');S.google=next;googleSyncStatus();syncOverlay(next);

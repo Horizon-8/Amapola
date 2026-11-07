@@ -1,3 +1,12 @@
+# Pruebas de la versión 0.8.0
+
+1. Reabre Amapola.exe: comprueba v0.8.0 y una bienvenida breve. Sin Google configurado, debe abrir el calendario normalmente. Con Google conectado recibe automáticamente, sin enviar; si tarda más de dos segundos, espera al resultado. Sin Internet abre con los datos locales y avisa; tras restaurar no recibe hasta reanudar.
+2. Los botones Actualizar desde Google y Enviar a Google deben aparecer con color en la barra de la semana, junto a Semana/Agenda. Los resúmenes ocupan menos altura.
+3. Abre Agendas, marca varias opciones y comprueba que la lista permanece abierta. Cierra pulsando fuera o Escape. Prueba teclado, temas claro/oscuro y regreso desde otra página. Los agendas ocultos siguen contando en los solapamientos.
+4. Activa movimiento reducido en Windows: la bienvenida no debe animarse ni imponer una espera artificial.
+
+## Pruebas anteriores
+
 # Pruebas de la versión 0.7.0 — prioridades manuales, filtros y repetición
 
 1. Abre Amapola.exe y comprueba v0.7.0. Con Google conectado debe ofrecer recibir al abrir. Prueba recibir y trabajar sin actualizar. Durante un intercambio debe aparecer la flor animada y no debe poder editarse el calendario, tampoco pulsando Escape.

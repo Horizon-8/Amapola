@@ -3,25 +3,25 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { paymentState, hasEnded } from '../app/public/class-utils.mjs';
-function ui(){
+function ui({setTimeoutImpl=fn=>{fn();return 1;}}={}){
   const source=readFileSync(new URL('../app/public/app.js',import.meta.url),'utf8'),nodes={},events=[];
   const node=selector=>nodes[selector]??={open:false,innerHTML:'',textContent:'',classList:{toggle(){}},showModal(){this.open=true;events.push('open');},close(){this.open=false;events.push('close');}};
-  const context=vm.createContext({URL,paymentState,hasEnded,setTimeout:fn=>{fn();return 1;},clearTimeout(){},window:{matchMedia:()=>({addEventListener(){}})},localStorage:{getItem:()=>null},location:{hash:'#calendario'},document:{querySelector:node,querySelectorAll:()=>[]}});
+  const context=vm.createContext({URL,paymentState,hasEnded,setTimeout:setTimeoutImpl,clearTimeout(){},window:{matchMedia:()=>({addEventListener(){}})},localStorage:{getItem:()=>null},location:{hash:'#calendario'},document:{querySelector:node,querySelectorAll:()=>[]}});
   vm.runInContext(source.slice(source.indexOf('/* Amapola'),source.indexOf("document.addEventListener('click'")),context);
+  vm.runInContext('S.opening=false;',context);
   return {context,nodes,events};
 }
-test('startup asks to receive and closing offers send/close, with no shutdown if sending fails',async()=>{
+test('closing offers send/close, with no shutdown if sending fails',async()=>{
   const {context}=ui();vm.runInContext(`
     S.google={configured:true,connected:true,paused:false};globalThis.forms=[];globalThis.actions=[];
     modal=(title,subtitle,body,footer,submit)=>forms.push({title,body,footer,submit});
     runGoogleSync=async direction=>actions.push(direction);shutdownLocalApp=async()=>actions.push('close');
-    startupGooglePrompt();shutdownPrompt();
+    shutdownPrompt();
   `,context);
-  assert.match(context.forms[0].footer,/Trabajar sin actualizar/);assert.match(context.forms[0].footer,/Recibir de Google/);
-  assert.match(context.forms[1].footer,/Cerrar sin enviar/);assert.match(context.forms[1].footer,/Enviar y cerrar/);assert.match(context.forms[1].footer,/Cancelar/);
-  await context.forms[0].submit();await context.forms[1].submit();assert.deepEqual(Array.from(context.actions),['pull','push','close']);
+  assert.match(context.forms[0].footer,/Cerrar sin enviar/);assert.match(context.forms[0].footer,/Enviar y cerrar/);assert.match(context.forms[0].footer,/Cancelar/);
+  await context.forms[0].submit();assert.deepEqual(Array.from(context.actions),['push','close']);
   vm.runInContext("runGoogleSync=async()=>{throw Error('Sin Internet');};",context);
-  await assert.rejects(context.forms[1].submit(),/Sin Internet/);assert.deepEqual(Array.from(context.actions),['pull','push','close']);
+  await assert.rejects(context.forms[0].submit(),/Sin Internet/);assert.deepEqual(Array.from(context.actions),['push','close']);
 });
 test('the flower overlay remains open while the operation runs, suppresses duplicate clicks, and closes only after confirmation',async()=>{
   const {context,nodes,events}=ui();vm.runInContext(`
@@ -75,4 +75,46 @@ test('complete calendar rendering and navigation work with or without a Google c
     assert.equal(context.errors.length,0);assert.equal(context.gestures,2);assert.equal(listeners.length,4);
     assert.match(nodes['#main'].innerHTML,/Agendas visibles/);
   });
+});
+
+test('opening receives only from Google and waits for both the animation and real synchronization before unlocking',async()=>{
+  let releaseAnimation,releaseReceive;
+  const receive=new Promise(resolve=>releaseReceive=resolve);
+  const {context,nodes}=ui({setTimeoutImpl:(fn,ms)=>{assert.equal(ms,1700);releaseAnimation=fn;}});
+  const shell={inert:true};context.document.querySelectorAll=selector=>selector==='[data-opening-inert]'?[shell]:[];
+  context.receiveWait=receive;
+  vm.runInContext(`
+    globalThis.actions=[];refresh=async()=>{S.google={connected:true,configured:true,paused:false};};
+    render=async()=>actions.push('render');runGoogleSync=async direction=>{actions.push(direction);syncOverlay({state:'syncing',operation:{stage:'Recibiendo los agendas…'}});await receiveWait;};
+    toast=()=>{};globalThis.opening=openApplication();
+  `,context);
+  await Promise.resolve();assert.deepEqual(Array.from(context.actions),['pull']);assert.equal(shell.inert,true);
+  assert.match(nodes['#startup-message'].textContent,/Recibiendo/);assert.equal(nodes['#google-progress'],undefined);
+  releaseAnimation();await Promise.resolve();assert.equal(shell.inert,true,'finishing the animation must not unlock a running receipt');
+  releaseReceive();await context.opening;assert.equal(shell.inert,false);assert.equal(nodes['#startup-screen'].hidden,true);assert.deepEqual(Array.from(context.actions),['pull','render']);
+});
+
+test('opening without Google or after restoring never starts an exchange, and an offline receipt still unlocks local data',async t=>{
+  for(const kind of ['unconfigured','paused','offline'])await t.test(kind,async()=>{
+    const {context,nodes}=ui();context.kind=kind;
+    vm.runInContext(`
+      globalThis.actions=[];globalThis.warnings=[];
+      refresh=async()=>{S.google={configured:kind!=='unconfigured',connected:kind!=='unconfigured',paused:kind==='paused'};};
+      render=async()=>actions.push('render');runGoogleSync=async direction=>{actions.push(direction);throw Error('Sin Internet');};
+      calendarConnectionWarning=message=>warnings.push(message);toast=()=>{};globalThis.opening=openApplication();
+    `,context);
+    await context.opening;assert.equal(nodes['#startup-screen'].hidden,true);assert.equal(context.actions.includes('push'),false);
+    assert.deepEqual(Array.from(context.actions),kind==='offline'?['pull','render']:['render']);assert.equal(context.warnings.length,kind==='offline'?1:0);
+  });
+});
+
+test('calendar sync buttons and the collapsed agenda selector belong to the toolbar rather than above the summaries',()=>{
+  const {context}=ui();vm.runInContext(`
+    Object.assign(S,{today:'2026-10-30',week:'2026-10-26',google:{connected:true,calendars:[],sourceIds:null}});
+    globalThis.html=renderCalendar([],{current:{count:0,hours:0,total:0}},[]);
+  `,context);
+  const html=context.html,toolbar=html.indexOf('calendar-toolbar'),receive=html.indexOf('data-action="google-pull"'),view=html.indexOf('class="view-toggle"');
+  assert.ok(toolbar<receive&&receive<view);assert.match(html,/class="btn google-receive/);assert.match(html,/class="btn google-send/);
+  assert.match(html,/<details class="calendar-agendas" id="calendar-agendas">/);assert.doesNotMatch(html,/<details[^>]*\sopen[\s>]/);
+  assert.ok(html.indexOf('calendar-visibility')>toolbar);
 });

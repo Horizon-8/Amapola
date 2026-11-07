@@ -49,10 +49,12 @@ test('an old server displays a useful startup error instead of an infinite loadi
   const startup=source.slice(0,source.indexOf('/* Amapola'));
   const children=[];
   const node=()=>({className:'',textContent:'',append(...items){children.push(...items);},addEventListener(){}});
-  const document={getElementById:()=>({replaceChildren(){}}),createElement:node};
+  const screen={removed:false,remove(){this.removed=true;}},shell={inert:true};
+  const document={getElementById:id=>id==='startup-screen'?screen:{replaceChildren(){}},querySelectorAll:()=>[shell],createElement:node};
   const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
   const run=new AsyncFunction('fetch','document','location',startup);
   await assert.rejects(run(async()=>json({app:'amapola',version:'0.1.0'}),document,{}),/versión anterior/);
   assert.ok(children.some(child=>child.textContent==='No se pudo iniciar Amapola'));
   assert.ok(children.some(child=>child.textContent.includes('Abre de nuevo Amapola.exe')));
+  assert.equal(screen.removed,true);assert.equal(shell.inert,false);
 });

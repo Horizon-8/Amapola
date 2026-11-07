@@ -1,4 +1,4 @@
-# Google Calendar dans Amapola 0.7.0
+# Google Calendar dans Amapola 0.8.0
 
 ## Première connexion
 
@@ -15,7 +15,7 @@ Les permissions demandées permettent de lire les agendas accessibles et leurs �
 
 ## Recevoir et envoyer
 
-À l'ouverture, Amapola propose de recevoir les prochains **30 jours**, aujourd'hui inclus. Tu peux accepter ou travailler avec les données déjà présentes sur le PC. Ensuite, les échanges sont manuels : aucune modification n'est envoyée automatiquement et aucun échange périodique ne démarre en arrière-plan.
+À l'ouverture, une courte animation accompagne le chargement local et la réception des prochains **30 jours**, aujourd'hui inclus, si Google est connecté et la connexion n'est pas en pause. L'animation dure environ 1,7 seconde lorsque tout est rapide ; si Google prend plus de temps, la progression attend son résultat réel. Hors connexion, les données locales restent accessibles avec un avertissement. Ensuite, les échanges sont manuels : aucune modification n'est envoyée automatiquement et aucun échange périodique ne démarre en arrière-plan.
 
 | Bouton du calendrier | Source prioritaire | Résultat |
 | --- | --- | --- |
@@ -49,7 +49,7 @@ Une fenêtre avec une fleur animée bloque l'édition pendant l'échange. Elle r
 
 **Cerrar aplicación** propose **Enviar y cerrar**, **Cerrar sin enviar** et **Cancelar**. L'envoi doit réussir avant la fermeture ; s'il échoue, Amapola reste ouverte. Fermer simplement l'onglet du navigateur n'arrête pas le programme local et ne permet pas d'afficher ce dialogue de fermeture personnalisé.
 
-Amapola.exe doit être ouvert pour échanger avec Google. Lorsque le PC est éteint, les événements déjà envoyés restent accessibles sur le téléphone. Les changements du téléphone seront récupérés à la prochaine réception acceptée.
+Amapola.exe doit être ouvert pour échanger avec Google. Lorsque le PC est éteint, les événements déjà envoyés restent accessibles sur le téléphone. Les changements du téléphone seront récupérés à la prochaine ouverture avec Google connecté, ou à la prochaine réception manuelle.
 
 ## Sauvegarde et changement de PC
 

@@ -1,5 +1,12 @@
 # Amapola
 
+## Versión 0.8.0 - calendario compacto y bienvenida
+
+Los botones Google tienen color y están junto a la navegación semanal y Semana/Agenda. Los agendas visibles se eligen en un menú desplegable con casillas; se mantiene abierto al cambiar una selección. Los resúmenes ocupan menos altura.
+
+Al abrir, una bienvenida animada de unos 1,7 segundos cubre la carga local y recibe Google si está conectado y no está en pausa. Si la recepción tarda más, la bienvenida espera al resultado real. Sin Google funciona igualmente; si falla Internet se abre con los datos locales y un aviso. No hay envío automático ni intercambio periódico. Se respeta la preferencia de movimiento reducido. Consulta AUDIT-AMAPOLA.md para las propuestas de mejora, que no se han implementado.
+
+
 ## Versión 0.7.1 - apertura del calendario sin conexión Google
 
 Corrige un error de interfaz en los filtros de agendas que impedía abrir las vistas, con o sin cuenta Google configurada. Añade una prueba de apertura y navegación por Calendario, Alumnos y Planificación. Abre Amapola.exe y comprueba v0.7.1.
