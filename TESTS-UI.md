@@ -1,3 +1,13 @@
+# Pruebas de la versión 0.9.0
+
+1. Guarda una tarifa habitual en la ficha de un alumno. Crea una planificación desde su ficha y desde un espacio del calendario: debe proponer ese importe. Cambia de alumno y comprueba que se propone su tarifa. Cambia manualmente el precio y guarda: se conserva el importe elegido.
+2. Edita una clase o planificación existente: conserva su precio aunque cambies la tarifa habitual del alumno. Una clase pagada conserva su importe y pago.
+3. Pon el importe de una clase en 0: debe verse un aviso rojo sin impedir guardarla. Escribe un importe positivo: el aviso desaparece. Prueba también el formulario de asociación de una clase recibida de Google.
+4. Envía a Google: el título debe ser Clase con nombre, con nombre y apellidos en la descripción. Si cancelas la sesión, debe empezar por [Cancelada]. Recibe de nuevo: el título local de la clase no cambia por el título generado. Una edición manual de título en Google sí se recibe.
+5. Descarga y restaura una copia: tarifas habituales, precios de las clases, pagos y vínculos Google se conservan. Una copia antigua se puede restaurar; los alumnos sin tarifa habitual quedan en 0 sin modificar los precios existentes.
+
+## Pruebas anteriores
+
 # Pruebas de la versión 0.8.1
 
 1. Reabre Amapola.exe y comprueba v0.8.1. Los botones Google deben usar el mismo rosado, con degradados verticales en sentidos opuestos.

@@ -1,5 +1,16 @@
 # Amapola
 
+## Versión 0.9.0 - tarifa habitual del alumno y títulos Google
+
+En la ficha del alumno puedes guardar una Tarifa habitual por clase. Se propone en una clase o planificación nueva y al asociar una clase recibida de Google. Al cambiar de alumno se propone su tarifa; puedes editarla. Cambiar la tarifa habitual no modifica clases ya creadas, pagos ni planificaciones existentes. Un importe explícito de cero sigue siendo válido para clases gratuitas, pero se resalta en rojo con una advertencia mientras editas.
+
+En Google los eventos se llaman Clase con Ana y conservan [Cancelada] cuando corresponde. La descripción mantiene nombre y apellidos. El nombre local de la clase se conserva durante un intercambio sin cambios; si se cambia el título manualmente en Google, Actualizar sigue recibiendo ese cambio. Pulsa Enviar a Google para actualizar los títulos ya enviados.
+
+Base y copias v8, con lectura de archivos v1-v7. Antes de migrar se conserva una copia en el formato anterior. La versión 0.5.x usa la misma carpeta de datos que la actual: en el mismo PC, actualizar los archivos del programa conserva los datos locales. En otro PC, restaura una copia .amapola. Exporta una copia antes de actualizar y conserva la anterior; una versión antigua no puede abrir la base ya migrada. No basta con copiar el ejecutable: la actualización portátil incluye app, runtime y los demás archivos.
+
+Esta versión es para pruebas locales. No se ha publicado en GitHub ni se ha creado un ZIP nuevo; se hará después de revisar los cambios.
+
+
 ## Versión 0.8.1 - botones rosados, aviso al cerrar pestaña e interfaz modular
 
 Los dos botones Google usan la misma gama rosada, con degradados verticales opuestos. La interfaz se reparte en módulos de calendario, alumnos, clases y pagos, planificación, Google, parámetros y formularios compartidos. app.js conserva el estado y la coordinación.

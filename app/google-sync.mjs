@@ -199,6 +199,10 @@ export class GoogleSync {
       const slot=googleSlot(event,this.store.settings().timezone);
       if(!slot){link.review='Revisa en Google este horario de varios días o fuera de la duración de una clase.';link.etag=event.etag;this.write(linkId(link.key),link);return;}
       const remoteStatus=event.extendedProperties?.private?.amapolaStatus;
+      const metadata=event.extendedProperties?.private||{};
+      // Amapola's display name in Google is independent of the local course
+      // title. A manually changed Google title still takes priority on receipt.
+      if(event.summary===metadata.amapolaSummary&&typeof metadata.amapolaTitle==='string'&&metadata.amapolaTitle.trim()&&metadata.amapolaTitle.length<=150)slot.title=metadata.amapolaTitle;
       const status=['planned','confirmed','completed','cancelled'].includes(remoteStatus)?remoteStatus:local.isDeleted||local.status==='cancelled'?'planned':local.status;
       if(status==='cancelled')slot.title=slot.title.replace(/^\[Cancelada\] /,'');
       const saved=this.store.persistSession(local,{...slot,status,isDeleted:0,isOverride:1});link.sessionId=saved.id;link.baseHash=fingerprint(saved);link.gone=false;
@@ -297,10 +301,11 @@ export class GoogleSync {
     const zone=this.store.settings().timezone,minutes=Number(row.time.slice(0,2))*60+Number(row.time.slice(3))+row.duration;
     const end=`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;
     const student=this.store.get('students',row.studentId),paid=row.paymentStatus==='paid';
-    return {status:'confirmed',summary:(row.status==='cancelled'?'[Cancelada] ':'')+row.title,
+    const summary=(row.status==='cancelled'?'[Cancelada] ':'')+'Clase con '+student.firstName;
+    return {status:'confirmed',summary,
       description:`Amapola\nAlumno: ${student.firstName} ${student.lastName}\nTarifa: ${(row.price/100).toFixed(2)} ${this.store.settings().currency}\nPago: ${paid?'Pagada':'Pendiente'}${row.paymentMethod?' · '+row.paymentMethod:''}\nModalidad: ${row.modality}\nEstado: ${row.status}\n\nInformación de referencia. Alumno, tarifa y pago se modifican en Amapola.`,
       start:{dateTime:utcInstant(row.date,row.time,zone),timeZone:zone},end:{dateTime:utcInstant(row.date,end,zone),timeZone:zone},
-      transparency:row.status==='cancelled'?'transparent':'opaque',extendedProperties:{private:{amapolaWorkspace:this.config.namespace,amapolaClass:key,amapolaStatus:row.status}}};
+      transparency:row.status==='cancelled'?'transparent':'opaque',extendedProperties:{private:{amapolaWorkspace:this.config.namespace,amapolaClass:key,amapolaStatus:row.status,amapolaTitle:row.title,amapolaSummary:summary}}};
   }
   complete(id,value){
     const record=this.read(id);if(!record||!record.pending||record.dismissed||record.event.status==='cancelled')throw new AppError('Esta clase Google ya no está pendiente.',409);

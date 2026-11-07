@@ -147,6 +147,21 @@ test('Google settings select calendars and imported busy or pending lessons rend
   assert.match(context.calendarPage,/data-action="google-push" data-google-direction="push"/);assert.match(context.calendarPage,/Enviar a Google/);assert.match(context.calendarPage,/Próximos 30 días/);
 });
 
+test('student tariffs appear in the student form and prefill new plans and Google assignments without rewriting existing prices',()=>{
+  const elements={},context=vm.createContext({URL,paymentState,hasEnded,window:{matchMedia:()=>({addEventListener(){}})},localStorage:{getItem:()=>null},document:{querySelector:key=>elements[key]??={value:'weekly',addEventListener(){},querySelectorAll:()=>[]},querySelectorAll:()=>[]}});
+  vm.runInContext(uiDefinitions()+`
+    Object.assign(S,{today:'2026-11-07',week:'2026-11-02',students:[{id:'s1',firstName:'Ana',lastName:'Pérez',defaultPrice:2500,color:'#bc587a',active:1,stage:'student',channel:'whatsapp'}],schedules:[]});
+    globalThis.forms=[];modal=(title,subtitle,body,footer)=>forms.push({title,body,footer});setupConflicts=()=>{};
+    studentModal('s1');scheduleModal(null,'s1');
+    S.schedules=[{id:'old',studentId:'s1',startDate:S.today,endDate:'',weekday:5,time:'10:00',duration:60,price:900,title:'Existente',modality:'online',recurrence:'weekly',active:1}];scheduleModal('old');
+    S.google={inbox:[{id:'incoming',title:'Clase móvil',date:S.today,time:'10:00',duration:60}]};googleCompleteModal('incoming');
+  `,context);
+  assert.match(context.forms[0].body,/name="defaultPrice"[^>]*value="25.00"/);
+  assert.match(context.forms[1].body,/name="price"[^>]*value="25.00"[^>]*data-student-default=true/);
+  assert.match(context.forms[2].body,/name="price"[^>]*value="9.00"/);assert.doesNotMatch(context.forms[2].body,/data-student-default/);
+  assert.match(context.forms[3].body,/name="price"[^>]*value="25.00"[^>]*data-student-default=true/);
+});
+
 function fakeTarget() {
   const handlers=new Map();
   return {addEventListener(type,fn,{signal}={}) { if(!handlers.has(type))handlers.set(type,[]);handlers.get(type).push(fn);signal?.addEventListener('abort',()=>handlers.set(type,handlers.get(type).filter(f=>f!==fn)),{once:true}); },

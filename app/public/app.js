@@ -2,7 +2,7 @@ let attachCalendarGestures, attachCalendarClock, paymentState, hasEnded, createA
 try {
   const response = await fetch('/api/health', { signal: AbortSignal.timeout(10000) });
   const health = await response.json();
-  if (!response.ok || health.app !== 'amapola' || health.version !== '0.8.1') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
+  if (!response.ok || health.app !== 'amapola' || health.version !== '0.9.0') throw new Error('Hay una versión anterior de Amapola abierta. Abre de nuevo Amapola.exe para reiniciarla y cargar la actualización.');
   ({ attachCalendarGestures } = await import('./calendar-interactions.mjs'));
   ({ attachCalendarClock } = await import('./calendar-clock.mjs'));
   ({ paymentState, hasEnded } = await import('./class-utils.mjs'));

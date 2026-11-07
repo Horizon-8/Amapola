@@ -159,7 +159,7 @@ test('HTTP handler connects class lists, payment changes, scoped calendar change
   const local=await request('/api/backups/local',{method:'POST',headers,data:{}});assert.equal(local.code,200);
   const downloaded=await request(`/api/backups/file/${local.json().filename}`,{headers});assert.equal(downloaded.code,200,downloaded.text());
   const archive=downloaded.bytes;
-  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,7);assert.equal(payload.sessions[0].paymentMethod,'cash');
+  const payload=JSON.parse(gunzipSync(archive));assert.equal(payload.version,8);assert.equal(payload.sessions[0].paymentMethod,'cash');
   await mutate(`/api/sessions/${next.id}/payment`,{paymentStatus:'unpaid',paymentMethod:''});
   const restored=await request('/api/restore',{method:'POST',headers:{...headers,'Content-Type':'application/octet-stream','X-Amapola-Confirm':'RESTAURAR'},bytes:archive});assert.equal(restored.code,200);
   assert.equal(app.store.get('sessions',next.id).paymentStatus,'paid');

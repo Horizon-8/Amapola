@@ -1,6 +1,6 @@
 // Forms views and actions. Dependencies are supplied by app.js.
 export function createFormsUI(context) {
-  const { $, cancelBtn, end, esc, fmtDate, icon } = context;
+  const { $, S, cancelBtn, end, esc, fmtDate, icon, priceInput } = context;
   const api = (...args) => context.api(...args);
   const confirmAction = (...args) => context.confirmAction(...args);
   const confirmConflicts = (...args) => context.confirmConflicts(...args);
@@ -12,7 +12,23 @@ export function createFormsUI(context) {
   const textField = (...args) => context.textField(...args);
   const toast = (...args) => context.toast(...args);
 
-  function _inputField(name,label,value='',type='text',extra='',help='') { return `<div class="field"><label for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}>${help?`<small>${help}</small>`:''}</div>`; }
+  const priceIsZero=value=>/^\d{1,10}([.,]\d{1,2})?$/.test(String(value).trim())&&Number(String(value).trim().replace(',','.'))===0;
+  function _inputField(name,label,value='',type='text',extra='',help='') {
+    const price=name==='price',zero=price&&priceIsZero(value);
+    return `<div class="field${zero?' price-zero':''}"><label for="${name}">${label}</label><input id="${name}" name="${name}" type="${type}" value="${esc(value)}" ${price?'aria-describedby="class-price-warning"':''} ${extra}>${help?`<small>${help}</small>`:''}${price?`<small class="class-price-warning" id="class-price-warning" role="status" ${zero?'':'hidden'}>Atención: esta clase tiene tarifa 0. Si no es gratuita, indica el importe.</small>`:''}</div>`;
+  }
+
+  function setupClassPrice(form) {
+    const price=form?.elements?.price;if(!price)return;
+    const warning=form.querySelector('#class-price-warning'),field=price.closest('.field');
+    const update=()=>{const zero=priceIsZero(price.value);field?.classList.toggle('price-zero',zero);if(warning)warning.hidden=!zero;};
+    price.addEventListener('input',update);
+    const student=form.elements.studentId;
+    if(student&&price.dataset.studentDefault==='true'){
+      const apply=()=>{price.value=priceInput(S.students.find(row=>row.id===student.value)?.defaultPrice??0);update();};
+      student.addEventListener('change',apply);apply();
+    }else update();
+  }
 
   function _selectField(name,label,value,options,extra='') { return `<div class="field"><label for="${name}">${label}</label><select id="${name}" name="${name}" ${extra}>${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(value)?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`; }
 
@@ -22,6 +38,7 @@ export function createFormsUI(context) {
     const dialog=$('#dialog');
     $('#dialog-content').innerHTML=`<form id="modal-form"><div class="dialog-header"><div><h2 id="dialog-title">${title}</h2><p>${subtitle}</p></div><button type="button" class="icon-button" data-action="close-dialog" aria-label="Cerrar">${icon('close')}</button></div><div class="dialog-body">${body}<div id="modal-error" class="form-error" role="alert"></div></div><div class="dialog-footer">${footer}</div></form>`;
     dialog.setAttribute('aria-labelledby','dialog-title');
+    setupClassPrice($('#modal-form'));
     $('#modal-form').addEventListener('submit',async ev=>{ev.preventDefault();const button=$('#modal-form button[type=submit]');if(button)button.disabled=true;$('#modal-error').textContent='';try{await submit(ev.target);}catch(e){if($('#modal-error'))$('#modal-error').textContent=e.message;else toast(e.message,true);}finally{if(button)button.disabled=false;}});
     if(!dialog.open)dialog.showModal();
   }
@@ -71,5 +88,5 @@ export function createFormsUI(context) {
     modal(title,'',`<p class="small-text">${message}</p>`,cancelBtn+`<button type="submit" class="btn ${danger?'danger':'primary'}">${label}</button>`,async()=>{await callback();$('#dialog').close();});
   }
 
-  return { inputField: _inputField, selectField: _selectField, textField: _textField, modal: _modal, conflictMarkup: _conflictMarkup, setupConflicts: _setupConflicts, confirmConflicts: _confirmConflicts, confirmAction: _confirmAction };
+  return { setupClassPrice, inputField: _inputField, selectField: _selectField, textField: _textField, modal: _modal, conflictMarkup: _conflictMarkup, setupConflicts: _setupConflicts, confirmConflicts: _confirmConflicts, confirmAction: _confirmAction };
 }

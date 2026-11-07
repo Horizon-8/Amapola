@@ -53,7 +53,7 @@ export function studentInput(v) {
   return { firstName: text(v.firstName, 'Nombre', 100, true), lastName: text(v.lastName ?? '', 'Apellidos', 150),
     channel: choice(v.channel ?? 'whatsapp', ['whatsapp', 'messenger', 'instagram', 'email', 'phone', 'other'], 'Canal'),
     phone: text(v.phone ?? '', 'Teléfono', 60), email, messenger: text(v.messenger ?? '', 'Messenger', 200),
-    notes: text(v.notes ?? '', 'Notas', 6000), color, stage, active: stage === 'prospect' ? 0 : bool(v.active ?? true) };
+    notes: text(v.notes ?? '', 'Notas', 6000), defaultPrice: integer(v.defaultPrice === undefined ? 0 : v.defaultPrice, 0, 100000000000, 'Tarifa habitual'), color, stage, active: stage === 'prospect' ? 0 : bool(v.active ?? true) };
 }
 export function classInput(v, { strictTime = true } = {}) {
   const time = clock(v.time);
@@ -118,7 +118,8 @@ CREATE TABLE IF NOT EXISTS students (
  id TEXT PRIMARY KEY, firstName TEXT NOT NULL, lastName TEXT NOT NULL, channel TEXT NOT NULL,
  phone TEXT NOT NULL, email TEXT NOT NULL, messenger TEXT NOT NULL, notes TEXT NOT NULL,
  color TEXT NOT NULL, active INTEGER NOT NULL CHECK(active IN (0,1)), createdAt TEXT NOT NULL,
- stage TEXT NOT NULL DEFAULT 'student' CHECK(stage IN ('student','prospect')));
+ stage TEXT NOT NULL DEFAULT 'student' CHECK(stage IN ('student','prospect')),
+ defaultPrice INTEGER NOT NULL DEFAULT 0 CHECK(defaultPrice>=0));
 CREATE TABLE IF NOT EXISTS schedules (
  id TEXT PRIMARY KEY, studentId TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
  title TEXT NOT NULL, time TEXT NOT NULL, duration INTEGER NOT NULL CHECK(duration>0),
@@ -135,7 +136,7 @@ CREATE INDEX IF NOT EXISTS busy_blocks_date ON busy_blocks(date);
 CREATE TABLE IF NOT EXISTS google_sync (id TEXT PRIMARY KEY, json TEXT NOT NULL);
 `;
 const tableCols = {
-  students: ['id', 'firstName', 'lastName', 'channel', 'phone', 'email', 'messenger', 'notes', 'color', 'active', 'createdAt', 'stage'],
+  students: ['id', 'firstName', 'lastName', 'channel', 'phone', 'email', 'messenger', 'notes', 'color', 'active', 'createdAt', 'stage', 'defaultPrice'],
   schedules: ['id', 'studentId', 'title', 'time', 'duration', 'price', 'modality', 'notes', 'startDate', 'endDate', 'weekday', 'recurrence', 'active'],
   sessions: ['id', 'scheduleId', 'originalDate', 'studentId', 'title', 'date', 'time', 'duration', 'price', 'modality', 'notes', 'status', 'paymentStatus', 'paymentMethod', 'isOverride', 'isDeleted'],
   busy_blocks: ['id', 'title', 'date', 'time', 'duration', 'notes'],
@@ -146,9 +147,9 @@ export class Store {
     this.db = new DatabaseSync(file);
     this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;');
     const version = this.db.prepare('PRAGMA user_version').get().user_version;
-    if (version > 7) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
+    if (version > 8) { this.db.close(); throw new AppError('Esta base requiere una versión más reciente de Amapola.', 503); }
     try {
-      if ([1, 2, 3, 4, 5, 6].includes(version) && file !== ':memory:') {
+      if ([1, 2, 3, 4, 5, 6, 7].includes(version) && file !== ':memory:') {
         const dir = path.join(path.dirname(file), 'copias'); mkdirSync(dir, { recursive: true });
         const payload = { app: 'amapola', version, createdAt: new Date().toISOString(), settings: this.settings(), students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions') };
         if (version >= 3) payload.busy_blocks = this.all('busy_blocks');
@@ -171,11 +172,12 @@ export class Store {
         }
         const studentColumns = new Set(this.db.prepare('PRAGMA table_info(students)').all().map(c => c.name));
         if (!studentColumns.has('stage')) this.db.exec("ALTER TABLE students ADD COLUMN stage TEXT NOT NULL DEFAULT 'student' CHECK(stage IN ('student','prospect'));");
+        if (!studentColumns.has('defaultPrice')) this.db.exec('ALTER TABLE students ADD COLUMN defaultPrice INTEGER NOT NULL DEFAULT 0 CHECK(defaultPrice>=0);');
         if(version<7){
           const moved=new Map();for(const row of this.db.prepare("SELECT id FROM sessions WHERE instr(id,'@')>0").all()){const next=storedSessionId(row.id);if(next!==row.id){this.db.prepare('UPDATE sessions SET id=? WHERE id=?').run(next,row.id);moved.set(row.id,next);}}
           if(moved.size)for(const row of this.all('google_sync')){const value=JSON.parse(row.json);if(moved.has(value.sessionId))this.db.prepare('UPDATE google_sync SET json=? WHERE id=?').run(JSON.stringify({...value,sessionId:moved.get(value.sessionId)}),row.id);}
         }
-        this.db.exec('PRAGMA user_version=7;');
+        this.db.exec('PRAGMA user_version=8;');
       });
     } catch (error) { this.db.close(); throw error; }
     this.db.prepare('INSERT OR IGNORE INTO settings(id,json) VALUES(1,?)').run(JSON.stringify(defaults));
@@ -188,7 +190,7 @@ export class Store {
   update(table, id, data) { const cols = Object.keys(data); if (cols.some(c => !tableCols[table].includes(c) || c === 'id')) throw new Error('column'); this.db.prepare(`UPDATE ${table} SET ${cols.map(k => `${k}=?`).join(',')} WHERE id=?`).run(...cols.map(k => data[k]), id); return this.get(table, id); }
   transaction(fn) { if (this.previewing) return fn(); this.db.exec('BEGIN IMMEDIATE'); try { const r = fn(); this.db.exec('COMMIT'); return r; } catch (e) { this.db.exec('ROLLBACK'); throw e; } }
   saveStudent(v, id) {
-    const data = studentInput(v);
+    const data = studentInput({ ...v, defaultPrice: v.defaultPrice === undefined && id ? this.get('students', id).defaultPrice : v.defaultPrice });
     return this.transaction(() => {
       if (id) { this.get('students', id); this.freezePast(); return this.update('students', id, data); }
       return this.insert('students', { ...data, id: randomUUID(), createdAt: new Date().toISOString() });
@@ -245,6 +247,7 @@ export class Store {
       .sort((a, b) => `${a.date}${a.time}${a.id}`.localeCompare(`${b.date}${b.time}${b.id}`));
   }
   saveSchedule(v, id) {
+    if(!id&&v.price===undefined)v={...v,price:this.get('students',text(v.studentId,'Alumno',50,true)).defaultPrice};
     const data = scheduleInput(v);
     this.get('students', data.studentId);
     return this.transaction(() => {
@@ -478,7 +481,7 @@ export class Store {
   }
   exportData() {
     this.freezePast();
-    return this.transaction(() => ({ app: 'amapola', version: 7, createdAt: new Date().toISOString(), settings: this.settings(),
+    return this.transaction(() => ({ app: 'amapola', version: 8, createdAt: new Date().toISOString(), settings: this.settings(),
       students: this.all('students'), schedules: this.all('schedules'), sessions: this.all('sessions'), busy_blocks: this.all('busy_blocks'),google_sync:this.all('google_sync') }));
   }
   importData(raw) {
@@ -494,7 +497,7 @@ export class Store {
   close() { this.db.close(); }
 }
 export function validateArchive(raw) {
-  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5, 6, 7].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
+  if (!raw || raw.app !== 'amapola' || ![1, 2, 3, 4, 5, 6, 7, 8].includes(raw.version)) throw new AppError('Archivo Amapola no compatible.');
   if(raw.version<7&&Array.isArray(raw.sessions)){
     raw={...raw,sessions:raw.sessions.map(row=>({...row,id:storedSessionId(row.id)}))};
     if(Array.isArray(raw.google_sync))raw={...raw,google_sync:raw.google_sync.map(row=>{try{const value=JSON.parse(row.json);return {...row,json:JSON.stringify({...value,...(value.sessionId?{sessionId:storedSessionId(value.sessionId)}:{})})};}catch{return row;}})};

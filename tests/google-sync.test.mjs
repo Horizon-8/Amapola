@@ -95,12 +95,24 @@ test('upload applies Amapola despite concurrent phone edits and never imports a 
   const {store,api,sync,date,addClass}=await fixture(t),row=addClass();await sync.run('push');const remote=[...api.events.get('target').values()][0];
   api.set('target',{...remote,summary:'Teléfono',start:{dateTime:date+'T13:15:00.000Z'},end:{dateTime:date+'T14:00:00.000Z'}});
   store.savePayment({paymentStatus:'paid',paymentMethod:'transfer'},row.id);api.requests=[];await sync.run('push');
-  assert.equal(store.resolveSession(row.id).time,'10:00');assert.equal(api.events.get('target').get(remote.id).summary,'Español');assert.match(api.events.get('target').get(remote.id).description,/Pagada/);
+  assert.equal(store.resolveSession(row.id).time,'10:00');assert.equal(api.events.get('target').get(remote.id).summary,'Clase con Ana');assert.match(api.events.get('target').get(remote.id).description,/Pagada/);
   assert.ok(!api.requests.some(r=>r.method==='GET'&&r.route.includes('/events')));assert.ok(api.requests.filter(r=>r.method==='PATCH').every(r=>r.etag===undefined));
 });
 test('upload deletes locally removed classes despite a remote edit, without asking or downloading events',async t=>{
   const {store,api,sync,addClass}=await fixture(t),row=addClass();await sync.run('push');const remote=[...api.events.get('target').values()][0];store.deleteSession(row.id);api.set('target',{...remote,summary:'Modifié'});
   api.requests=[];await sync.run('push');assert.equal(api.events.get('target').size,0);assert.ok(!api.requests.some(r=>r.method==='GET'&&r.route.includes('/events')));assert.equal(sync.status().reviews.length,0);
+});
+
+test('Google titles identify the student, preserve cancellation and full names, and do not rename the local course on a round trip',async t=>{
+  const {store,api,sync,student,addClass}=await fixture(t);store.saveStudent({...student,active:true,lastName:'Pérez'},student.id);
+  const row=addClass();await sync.run('push');let remote=[...api.events.get('target').values()][0];
+  assert.equal(remote.summary,'Clase con Ana');assert.match(remote.description,/Ana Pérez/);
+  assert.equal(remote.extendedProperties.private.amapolaTitle,row.title);assert.equal(remote.extendedProperties.private.amapolaSummary,remote.summary);
+  await sync.run('pull');assert.equal(store.resolveSession(row.id).title,row.title);
+  api.set('target',{...remote,summary:'Título cambiado desde Google'});await sync.run('pull');assert.equal(store.resolveSession(row.id).title,'Título cambiado desde Google');
+  store.saveSessionStatus({status:'cancelled'},row.id);await sync.run('push');remote=api.events.get('target').get(remote.id);
+  assert.equal(remote.summary,'[Cancelada] Clase con Ana');assert.match(remote.description,/Ana Pérez/);
+  await sync.run('pull');assert.equal(store.resolveSession(row.id).title,'Título cambiado desde Google');assert.equal(store.resolveSession(row.id).status,'cancelled');
 });
 test('upload recreates a phone-deleted active class even when the local class is unchanged',async t=>{
   const {store,api,sync,addClass}=await fixture(t),row=addClass();await sync.run('push');api.events.get('target').clear();await sync.run('push');
@@ -157,7 +169,7 @@ test('operation state stays busy through all writes and rejects business edits u
 });
 test('sync links and pending imports survive backup/restore while authorization stays outside and sync is paused',async t=>{
   const {store,api,sync,date,addClass}=await fixture(t);addClass();await sync.run('push');api.set('personal',event('pending',date,{description:'Amapola'}));await sync.run('pull');
-  const archive=store.exportData();assert.equal(archive.version,7);assert.ok(archive.google_sync.some(r=>r.id.startsWith('link-')));assert.doesNotMatch(JSON.stringify(archive),/refresh-for-tests|clientSecret|access-for-tests/);
+  const archive=store.exportData();assert.equal(archive.version,8);assert.ok(archive.google_sync.some(r=>r.id.startsWith('link-')));assert.doesNotMatch(JSON.stringify(archive),/refresh-for-tests|clientSecret|access-for-tests/);
   const clean=new Store(':memory:');t.after(()=>clean.close());clean.importData(archive);assert.equal(JSON.parse(clean.all('google_sync').find(r=>r.id==='config').json).paused,true);assert.equal(clean.busyBlocks(date,date).length,1);
   clean.importData({...archive,version:5});assert.equal(clean.all('google_sync').length,0);
 });
@@ -188,13 +200,13 @@ test('concurrent API reads share a token refresh and persist one protected conne
   sync.fetch=async(url,options)=>{if(url==='https://oauth2.googleapis.com/token')refreshes++;return fetch(url,options);};
   await Promise.all([sync.calendars(),sync.calendars()]);assert.equal(refreshes,1);
 });
-test('a v5 database upgrades to v7 with a readable safety copy and unchanged payments',async t=>{
+test('a v5 database upgrades to v8 with a readable safety copy and unchanged payments',async t=>{
   const {dir}=await fixture(t),file=path.join(dir,'old.sqlite'),old=new Store(file);
   const student=old.saveStudent({firstName:'Conservar',color:'#bc587a'}),date=addDays(todayIn('UTC'),1);
   const rule=old.saveSchedule({studentId:student.id,title:'Clase',time:'10:00',duration:60,price:50000,startDate:date,weekday:weekday(date),recurrence:'once'});
   old.savePayment({paymentStatus:'paid',paymentMethod:'cash'},old.projected(rule,date).id);old.db.exec('DROP TABLE google_sync; PRAGMA user_version=5;');old.close();
   const next=new Store(file);try {
-    assert.equal(next.db.prepare('PRAGMA user_version').get().user_version,7);assert.equal(next.all('sessions')[0].paymentStatus,'paid');
+    assert.equal(next.db.prepare('PRAGMA user_version').get().user_version,8);assert.equal(next.all('sessions')[0].paymentStatus,'paid');
     const copies=await readdir(path.join(dir,'copias')),raw=JSON.parse(gunzipSync(await readFile(path.join(dir,'copias',copies[0]))));assert.equal(raw.version,5);assert.equal(raw.sessions[0].paymentMethod,'cash');
   } finally {next.close();}
 });
@@ -204,7 +216,7 @@ test('v6 migration preserves Google links in its pre-upgrade backup before enabl
   old.insert('sessions',legacy);old.insert('google_sync',{id:'link-'+'a'.repeat(64),json:JSON.stringify({key:legacy.id,sessionId:legacy.id,googleId:'google-event',etag:'known'})});
   old.insert('google_sync',{id:'config',json:JSON.stringify({namespace:'12345678-1234-1234-1234-123456789abc',account:'personal',calendarId:'target',sourceIds:null,lastPull:'2026-10-30T10:00:00Z'})});old.db.exec('PRAGMA user_version=6;');old.close();
   const current=new Store(file);try{
-    assert.equal(current.db.prepare('PRAGMA user_version').get().user_version,7);assert.equal(JSON.parse(current.all('google_sync').find(r=>r.id==='config').json).calendarId,'target');
+    assert.equal(current.db.prepare('PRAGMA user_version').get().user_version,8);assert.equal(JSON.parse(current.all('google_sync').find(r=>r.id==='config').json).calendarId,'target');
     const copies=await readdir(path.join(dir,'copias')),raw=JSON.parse(gunzipSync(await readFile(path.join(dir,'copias',copies[0]))));assert.equal(raw.version,6);assert.equal(JSON.parse(raw.google_sync.find(r=>r.id==='config').json).calendarId,'target');
     const corrected=current.all('sessions')[0];assert.doesNotMatch(corrected.id,/@/);assert.equal(JSON.parse(current.all('google_sync').find(r=>r.id.startsWith('link-')).json).sessionId,corrected.id);
     const clean=new Store(':memory:');try{clean.importData(raw);assert.equal(clean.all('sessions')[0].id,corrected.id);}finally{clean.close();}

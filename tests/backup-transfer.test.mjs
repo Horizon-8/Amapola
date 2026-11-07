@@ -55,7 +55,7 @@ test('a downloaded backup restores every business field on a clean PC, including
     const copy=await new Backups(source,sourceDir).snapshot();
     const downloaded=await new Backups(source,sourceDir).read(copy.filename);
     const decoded=decodeArchive(downloaded),raw=JSON.parse(gunzipSync(downloaded));
-    assert.equal(raw.version,7);
+    assert.equal(raw.version,8);
     assert.deepEqual(decoded.students.find(row=>row.id===prospect.id).notes,prospect.notes);
     const expected=data(source);
     source.close();source=null;

@@ -1,4 +1,4 @@
-# Google Calendar dans Amapola 0.8.1
+# Google Calendar dans Amapola 0.9.0
 
 ## Première connexion
 
@@ -27,6 +27,8 @@ Une réception applique le titre, la date, l'horaire et l'état Google aux class
 Un envoi met à jour les classes existantes, crée les nouvelles et supprime dans Google celles supprimées localement. Une classe locale dont l'événement a été supprimé sur le téléphone est recréée. Le sens choisi s'applique directement, sans confirmation supplémentaire de rapprochement. Les autres agendas Google ne sont jamais modifiés.
 
 L'élève, le tarif, la modalité et le paiement restent gérés dans Amapola. Leur description dans Google est informative. Les identifiants des événements et des propriétés privées permettent de retrouver les classes ; il n'est pas nécessaire de copier ces identifiants à la main.
+
+Les titres envoyés sont désormais **Clase con Ana**, avec **[Cancelada]** devant si nécessaire. La description conserve le nom complet. Les liens existants sont réutilisés : le prochain envoi actualise les titres. Le titre local du cours est conservé lors d’un aller-retour inchangé ; une modification manuelle du titre dans Google reste reçue par Actualizar.
 
 ## Agendas et nouveaux cours
 

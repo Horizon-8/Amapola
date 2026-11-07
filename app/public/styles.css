@@ -232,3 +232,6 @@
 .calendar-sync-controls .btn.google-receive:hover,.calendar-sync-controls .btn.google-send:hover{--google-gradient-end:color-mix(in srgb,var(--rose) 48%,var(--surface));color:var(--rose-dark)}
 .calendar-sync-controls .btn.google-ok{box-shadow:inset 0 -2px 0 var(--success)}
 .calendar-sync-controls .btn.google-failed{background:color-mix(in srgb,var(--danger) 12%,var(--surface));border-color:var(--danger);color:var(--danger)}
+
+/* Zero is allowed for free classes, but should never go unnoticed. */
+.field.price-zero>label{color:var(--danger);font-weight:600}.field.price-zero input{border:2px solid var(--danger);background:color-mix(in srgb,var(--danger) 9%,var(--surface))}.field .class-price-warning{color:var(--danger);font-weight:600;line-height:1.5}.class-price-warning[hidden]{display:none}

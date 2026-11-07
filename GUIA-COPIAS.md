@@ -1,5 +1,12 @@
 # Guardar tus datos y cambiar de ordenador
 
+## Copias actuales v8 - Amapola 0.9.0
+
+Incluyen la tarifa habitual de cada alumno y todos los datos anteriores, incluidos pagos y vínculos Google. Se pueden restaurar copias v1-v7. Al actualizar desde 0.5.x o 0.8.x se crea primero una copia en el formato anterior y se conserva la carpeta de datos existente. Los alumnos antiguos empiezan con tarifa habitual 0; no se cambia el precio de sus clases ya creadas. La tarifa se puede completar en su ficha.
+
+Antes de actualizar, descarga una copia .amapola. Conserva la copia y la versión anterior si necesitas volver atrás: los programas antiguos no pueden abrir la base v8. Para otro PC, instala la versión nueva completa y restaura el archivo .amapola. La autorización Google se reconecta en ese PC; los vínculos existentes se conservan.
+
+
 ## Copias actuales v7 — Amapola 0.7.0
 
 Incluyen todas las clases, pagos, alumnos, contactos, planificaciones (también Cada dos semanas), bloqueos, vínculos Google, clases por completar, selección de agendas recibidos y preferencias de agendas visibles. La actualización crea antes una copia con el formato anterior. Se pueden restaurar archivos v1–v6 además de v7.
